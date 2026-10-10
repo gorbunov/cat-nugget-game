@@ -1,5 +1,5 @@
 extends Node2D
-## All simulation uses a fixed 640x360 logical canvas; assets are original.
+## All simulation uses a fixed 640x360 logical canvas.
 
 const ROUND_LENGTH := 60.0
 # Elapsed seconds, throw interval, flight time to target, music playback rate.
@@ -28,6 +28,11 @@ const GOLD := Color("ffc568")
 const PINK := Color("ed91a5")
 const MINT := Color("9bd2bc")
 const SAVE_PATH := "user://snack_save.cfg"
+const SOUND_CREDITS := [
+	{"title": "SMALL CROWD REACTIONS", "author": "IENBA", "use": "BURNT / FIRST 2 SECONDS", "id": "488472"},
+	{"title": "YAY.MP3", "author": "ZUT50", "use": "GOLDEN / FULL CLIP", "id": "162395"},
+	{"title": "GULPCARTOONY.MP3", "author": "GARY_IN_WV", "use": "BIG REGULAR / FULL CLIP", "id": "449868"},
+]
 const CAT_NAMES := ["MOCHI", "BISCUIT", "WAFFLES", "DUMPLING", "NOODLE", "PUDDING", "PICKLES", "PEBBLE", "BUTTONS", "MAPLE", "MISO", "BEAN", "SPROUT", "PUMPKIN", "PIP", "TOFU", "MUFFIN", "POPPY", "BOBA", "TATER"]
 const TRACKS := [
 	{"name": "SNACK TIME", "mood": "THE ORIGINAL BOUNCY CHIPTUNE", "file": "snack_time", "panic": "panic"},
@@ -48,6 +53,7 @@ var music: AudioStreamPlayer
 var panic_music: AudioStreamPlayer
 var voices: Array[AudioStreamPlayer] = []
 var sounds: Dictionary = {}
+var reaction_voice: AudioStreamPlayer
 var state := "title"
 var previous_state := "title"
 var clock := 0.0
@@ -74,6 +80,8 @@ var streak := 0
 var longest := 0
 var best := 0
 var old_best := 0
+var master_volume := 1.0
+var volume_drag := -1
 var music_volume := 0.55
 var sfx_volume := 0.7
 var selected_track := 0
@@ -116,8 +124,10 @@ func _ready() -> void:
 	queue_redraw()
 
 func _setup_audio() -> void:
-	for sound in ["catch", "combo", "miss", "throw", "tick", "finish"]:
+	for sound in ["catch", "combo", "miss", "throw", "tick", "finish", "reaction_eww", "reaction_yay", "reaction_nom"]:
 		sounds[sound] = load("res://assets/%s.wav" % sound)
+	reaction_voice = AudioStreamPlayer.new()
+	add_child(reaction_voice)
 	music = AudioStreamPlayer.new()
 	add_child(music)
 	panic_music = AudioStreamPlayer.new()
@@ -189,6 +199,7 @@ func _toggle_fullscreen() -> void:
 	_save_settings()
 
 func _close_settings() -> void:
+	volume_drag = -1
 	state = previous_state
 	_set_music_rate(_difficulty_at(ROUND_LENGTH - remaining).z if state == "paused" else 1.0)
 	music.stream_paused = state == "paused"
@@ -205,6 +216,12 @@ func _looped(path: String) -> AudioStreamWAV:
 func _sound(key: String, pitch: float = 1.0) -> void:
 	if test_mode:
 		return
+	if key.begins_with("reaction_"):
+		# One voice keeps rapid catches intelligible and cannot exhaust the SFX pool.
+		reaction_voice.stream = sounds[key]
+		reaction_voice.pitch_scale = pitch
+		reaction_voice.play()
+		return
 	for voice in voices:
 		if not voice.playing:
 			voice.stream = sounds[key]
@@ -213,10 +230,14 @@ func _sound(key: String, pitch: float = 1.0) -> void:
 			return
 
 func _set_volumes() -> void:
-	music.volume_db = linear_to_db(maxf(0.0001, music_volume * 0.45))
-	panic_music.volume_db = linear_to_db(maxf(0.0001, music_volume * 0.10))
+	var master_bus := AudioServer.get_bus_index("Master")
+	AudioServer.set_bus_volume_db(master_bus, linear_to_db(maxf(0.0001, master_volume)))
+	AudioServer.set_bus_mute(master_bus, master_volume <= 0)
+	reaction_voice.volume_linear = sfx_volume * 0.55
+	music.volume_linear = music_volume
+	panic_music.volume_linear = music_volume * 0.18
 	for voice in voices:
-		voice.volume_db = linear_to_db(maxf(0.0001, sfx_volume * 0.55))
+		voice.volume_linear = sfx_volume * 0.45
 
 func _load_settings(path: String = SAVE_PATH) -> void:
 	if test_mode and path == SAVE_PATH:
@@ -224,6 +245,7 @@ func _load_settings(path: String = SAVE_PATH) -> void:
 	var cfg := ConfigFile.new()
 	if cfg.load(path) == OK:
 		best = maxi(0, int(cfg.get_value("game", "best", 0)))
+		master_volume = clampf(float(cfg.get_value("audio", "master", 1.0)), 0, 1)
 		music_volume = clampf(float(cfg.get_value("audio", "music", 0.55)), 0, 1)
 		sfx_volume = clampf(float(cfg.get_value("audio", "effects", 0.7)), 0, 1)
 		selected_track = clampi(int(cfg.get_value("audio", "track", 0)), 0, TRACKS.size() - 1)
@@ -235,6 +257,7 @@ func _save_settings(path: String = SAVE_PATH) -> void:
 		return
 	var cfg := ConfigFile.new()
 	cfg.set_value("game", "best", best)
+	cfg.set_value("audio", "master", master_volume)
 	cfg.set_value("audio", "music", music_volume)
 	cfg.set_value("audio", "effects", sfx_volume)
 	cfg.set_value("audio", "track", selected_track)
@@ -251,15 +274,31 @@ func _notification(what: int) -> void:
 		_save_settings()
 
 func _input(event: InputEvent) -> void:
+	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT:
+		if not event.pressed and volume_drag >= 0:
+			volume_drag = -1
+			_save_settings()
+			return
+		if event.pressed and state == "settings":
+			for i in range(3):
+				if _volume_slider_rect(i).grow(5).has_point(get_global_mouse_position()):
+					volume_drag = i
+					_drag_volume(get_global_mouse_position().x)
+					return
+	if event is InputEventMouseMotion and volume_drag >= 0:
+		_drag_volume(get_global_mouse_position().x)
+		return
 	if event is InputEventKey and event.pressed and not event.echo:
 		if event.keycode == KEY_F11 or (event.keycode == KEY_ENTER and event.alt_pressed):
 			_toggle_fullscreen()
 		elif event.keycode == KEY_ESCAPE:
-			if state == "playing":
+			if state == "title":
+				_action("quit")
+			elif state == "playing":
 				_pause()
 			elif state == "paused":
 				_resume()
-			elif state in ["settings", "guide"]:
+			elif state in ["settings", "guide", "sources"]:
 				_close_settings()
 		elif event.keycode == KEY_ENTER or event.keycode == KEY_SPACE:
 			if state in ["title", "results"]:
@@ -297,9 +336,15 @@ func _action(action: String) -> void:
 			_set_music_rate(1.0)
 			music.stream_paused = false
 			panic_music.stop()
-		"guide":
+		"guide", "sources":
 			previous_state = state
-			state = "guide"
+			state = action
+		"source_488472", "source_162395", "source_449868":
+			if not test_mode:
+				OS.shell_open("https://freesound.org/s/" + action.trim_prefix("source_") + "/")
+		"source_license":
+			if not test_mode:
+				OS.shell_open("https://creativecommons.org/publicdomain/zero/1.0/")
 		"back": _close_settings()
 		"fullscreen": _toggle_fullscreen()
 		"track_prev", "track_next":
@@ -309,6 +354,8 @@ func _action(action: String) -> void:
 			shuffle_music = not shuffle_music
 			if shuffle_music:
 				_select_track(_random_choice(selected_track, TRACKS.size()))
+		"master_down": master_volume = maxf(0, master_volume - 0.1)
+		"master_up": master_volume = minf(1, master_volume + 0.1)
 		"music_down": music_volume = maxf(0, music_volume - 0.1)
 		"music_up": music_volume = minf(1, music_volume + 0.1)
 		"sfx_down": sfx_volume = maxf(0, sfx_volume - 0.1)
@@ -318,6 +365,19 @@ func _action(action: String) -> void:
 			get_tree().quit()
 	_set_volumes()
 	buttons.clear()
+	queue_redraw()
+
+func _volume_slider_rect(index: int) -> Rect2:
+	return Rect2(263, 161 + index * 36, 128, 12)
+
+func _drag_volume(pointer_x: float) -> void:
+	var slider := _volume_slider_rect(volume_drag)
+	var value := clampf((pointer_x - slider.position.x) / slider.size.x, 0, 1)
+	match volume_drag:
+		0: master_volume = value
+		1: music_volume = value
+		2: sfx_volume = value
+	_set_volumes()
 	queue_redraw()
 
 func _start() -> void:
@@ -559,10 +619,17 @@ func _eat_nugget(nugget: Dictionary, allow_sweep: bool = true) -> void:
 		golden_bonus = 0
 		expression = 0
 		offended = 1.0
-		_sound("miss", 0.7)
+		_sound("reaction_eww")
 		popups.append({"pos": nugget.pos + Vector2(0, -28), "text": "YUCK! -%d" % penalty, "life": 1.0, "color": PINK})
 		return
 	_catch(nugget.pos, NUGGET_TYPES[kind].points)
+	# The collection wave scores its catches silently on the vocal channel,
+	# preserving the big golden's cheer rather than stacking a chorus.
+	if allow_sweep:
+		if kind in ["golden", "big_golden"]:
+			_sound("reaction_yay")
+		elif kind == "big":
+			_sound("reaction_nom")
 	if kind == "golden":
 		golden_bonus = mini(4, golden_bonus + 1)
 		banner = "GOLDEN BOOST! X%d" % _multiplier()
@@ -652,6 +719,8 @@ func _draw() -> void:
 		_settings()
 	elif state == "guide":
 		_nugget_guide()
+	elif state == "sources":
+		_sources()
 	else:
 		_playfield()
 		if state == "paused":
@@ -733,6 +802,29 @@ func _nugget_region(kind: String, variant: int = 0) -> Rect2:
 	var frame: int = NUGGET_TYPES[kind].frame + (variant if kind == "regular" else 0)
 	return Rect2(frame * 32, 0, 32, 32)
 
+func _golden_glitter(n: Dictionary, size: float) -> void:
+	# Staggered glints grow and shrink in whole pixels. Simulation age freezes
+	# them on pause, and deterministic phases leave gameplay randomness alone.
+	var big: bool = n.kind == "big_golden"
+	var count := 5 if big else 3
+	for i in range(count):
+		var phase := fposmod(float(n.age) * 1.7 + i * 0.37 + float(n.spin) * 0.13, 1.0)
+		var pulse := maxf(0.0, 1.0 - absf(phase - 0.5) / 0.36)
+		if pulse <= 0:
+			continue
+		var angle := i * 2.4 + float(n.rotation)
+		var radius := size * (0.24 if i % 2 == 0 else 0.51)
+		var center: Vector2 = (n.pos + Vector2.RIGHT.rotated(angle) * radius).round()
+		var arm := 1 + floori(pulse * (4 if big else 3))
+		var warm := Color(1.0, 0.76, 0.22, pulse * 0.85)
+		var shine := Color(1.0, 0.98, 0.78, pulse)
+		# Gold shoulders and a cream-white cross keep the shine crisp at 1x.
+		draw_rect(Rect2(center - Vector2(2, 2), Vector2(5, 5)), warm)
+		draw_rect(Rect2(center - Vector2(arm, 0), Vector2(arm * 2 + 1, 1)), shine)
+		draw_rect(Rect2(center - Vector2(0, arm), Vector2(1, arm * 2 + 1)), shine)
+		if pulse > 0.7:
+			draw_rect(Rect2(center - Vector2.ONE, Vector2(3, 3)), shine)
+
 func _draw_flying_nugget(n: Dictionary) -> void:
 	var kind: String = n.kind
 	var spec: Dictionary = NUGGET_TYPES[kind]
@@ -740,14 +832,12 @@ func _draw_flying_nugget(n: Dictionary) -> void:
 	var golden := kind in ["golden", "big_golden"]
 	if golden:
 		draw_circle(n.pos, size * 0.65, Color(1, 0.85, 0.25, 0.18))
-		for i in range(3 if kind == "big_golden" else 2):
-			var sparkle: Vector2 = n.pos + Vector2.RIGHT.rotated(clock * 2 + i * TAU / 3) * (size * 0.65)
-			draw_line(sparkle - Vector2(2, 0), sparkle + Vector2(2, 0), GOLD)
-			draw_line(sparkle - Vector2(0, 2), sparkle + Vector2(0, 2), GOLD)
 	draw_circle(n.pos + Vector2(3, 7), size * 0.38, Color(0.25, 0.22, 0.25, 0.12))
 	draw_set_transform(n.pos, n.rotation)
 	draw_texture_rect_region(nugget_tex, Rect2(Vector2.ONE * (-size / 2), Vector2.ONE * size), _nugget_region(kind, n.variant))
 	draw_set_transform(Vector2.ZERO)
+	if golden:
+		_golden_glitter(n, size)
 	if spec.hp == 3:
 		for i in range(3):
 			var dot: Vector2 = n.pos + Vector2((i - 1) * 7, -size / 2 - 5)
@@ -846,9 +936,10 @@ func _title() -> void:
 	_button("LET'S EAT!", Rect2(100, 247, 245, 36), "start", true)
 	_button("SETTINGS", Rect2(366, 252, 105, 26), "settings")
 	_button("QUIT", Rect2(483, 252, 78, 26), "quit")
-	_text("BEST SNACK SCORE: %05d" % best, Vector2(224, 303), 8, GOLD, true)
+	_text("BEST SNACK SCORE: %05d" % best, Vector2(224, 290), 8, GOLD, true)
+	_button("SOURCES", Rect2(169, 308, 110, 18), "sources")
 	_button("NUGGET GUIDE + ODDS", Rect2(366, 293, 195, 24), "guide")
-	_text("ENTER: START  /  ESC: PAUSE  /  F11: FULLSCREEN", Vector2(320, 348), 8, INK, true)
+	_text("ENTER: START  /  ESC: QUIT  /  F11: FULLSCREEN", Vector2(320, 348), 8, INK, true)
 
 func _victory_dance() -> void:
 	var beat := results_time * 2.4
@@ -913,6 +1004,23 @@ func _nugget_guide() -> void:
 	_text("THROW ODDS AFTER 12S / TWO BIG GOLDENS: %.2f%%" % (BIG_GOLD_ROUND_CHANCE * SECOND_BIG_GOLD_CHANCE * 100), Vector2(320, 284), 8, MINT, true)
 	_button("READY TO SNACK", Rect2(240, 306, 160, 26), "back", true)
 
+func _sources() -> void:
+	draw_rect(Rect2(0, 0, 640, 360), Color(0.2, 0.17, 0.23, 0.35))
+	_panel(Rect2(75, 15, 490, 330))
+	_text("SOUNDS + SOURCES", Vector2(320, 32), 16, GOLD, true)
+	_text("THANKS TO THE FREESOUND CREATORS!", Vector2(320, 60), 8, MINT, true)
+	for i in range(SOUND_CREDITS.size()):
+		var credit: Dictionary = SOUND_CREDITS[i]
+		var y := 85 + i * 60
+		_text(credit.title, Vector2(100, y), 8, GOLD)
+		_text("BY " + credit.author + " / CC0", Vector2(100, y + 15), 8, CREAM)
+		_text(credit.use, Vector2(100, y + 30), 8, MINT)
+		_button("SOURCE", Rect2(440, y + 6, 98, 26), "source_" + credit.id)
+	_text("TRIMMED / LEVELS BALANCED / EDGE FADES", Vector2(320, 272), 8, CREAM, true)
+	_text("SOURCE AND LICENSE BUTTONS OPEN YOUR BROWSER", Vector2(320, 286), 8, MINT, true)
+	_button("CC0 LICENSE", Rect2(160, 308, 150, 24), "source_license")
+	_button("BACK", Rect2(330, 308, 150, 24), "back", true)
+
 func _settings() -> void:
 	draw_rect(Rect2(0, 0, 640, 360), Color(0.2, 0.17, 0.23, 0.3))
 	_panel(Rect2(120, 20, 400, 320))
@@ -923,18 +1031,21 @@ func _settings() -> void:
 	_text(TRACKS[selected_track].name, Vector2(320, 106), 16, CREAM, true)
 	_button(">", Rect2(455, 100, 32, 26), "track_next")
 	_text(TRACKS[selected_track].mood, Vector2(320, 134), 8, PINK, true)
-	for i in range(2):
-		var y := 164 + i * 39
-		var value := music_volume if i == 0 else sfx_volume
-		var key := "music" if i == 0 else "sfx"
-		_text("MUSIC" if i == 0 else "SOUNDS", Vector2(180, y+8), 8)
-		_button("-", Rect2(253, y, 28, 26), key + "_down")
-		for j in range(10):
-			draw_rect(Rect2(294 + j * 10, y+8, 7, 11), GOLD if j < roundi(value*10) else Color("725866"))
-		_button("+", Rect2(410, y, 28, 26), key + "_up")
-	_button("FULLSCREEN: ON" if fullscreen else "FULLSCREEN: OFF", Rect2(181, 252, 202, 26), "fullscreen")
-	_text("F11 / ALT+ENTER", Vector2(396, 261), 8, MINT)
-	_button("ALL GOOD", Rect2(251, 297, 138, 28), "back", true)
+	for i in range(3):
+		var y := 153 + i * 36
+		var value: float = [master_volume, music_volume, sfx_volume][i]
+		var key: String = ["master", "music", "sfx"][i]
+		_text(["MASTER", "MUSIC", "SOUNDS"][i], Vector2(145, y + 8), 8)
+		_button("-", Rect2(221, y, 28, 26), key + "_down")
+		var slider := _volume_slider_rect(i)
+		draw_rect(slider, Color("725866"))
+		draw_rect(Rect2(slider.position, Vector2(slider.size.x * value, slider.size.y)), GOLD)
+		draw_rect(Rect2(slider.position + Vector2(slider.size.x * value - 2, -3), Vector2(4, 18)), CREAM)
+		_button("+", Rect2(405, y, 28, 26), key + "_up")
+		_text("%d%%" % roundi(value * 100), Vector2(447, y + 8), 8, MINT)
+	_button("FULLSCREEN: ON" if fullscreen else "FULLSCREEN: OFF", Rect2(153, 264, 202, 26), "fullscreen")
+	_text("F11 / ALT+ENTER", Vector2(368, 273), 8, MINT)
+	_button("ALL GOOD", Rect2(251, 302, 138, 28), "back", true)
 
 func _run_smoke_test() -> void:
 	# Deterministic behavioral checks; does not touch real save data.
@@ -1059,6 +1170,7 @@ func _run_smoke_test() -> void:
 	if not OS.has_feature("standalone"):
 		DirAccess.make_dir_recursive_absolute("res://build")
 		best = 1234
+		master_volume = 0.6
 		music_volume = 0.3
 		sfx_volume = 0.8
 		selected_track = 2
@@ -1066,6 +1178,7 @@ func _run_smoke_test() -> void:
 		fullscreen = true
 		_save_settings("res://build/test_save.cfg")
 		best = 0
+		master_volume = 0
 		music_volume = 0
 		sfx_volume = 0
 		selected_track = 0
@@ -1073,6 +1186,20 @@ func _run_smoke_test() -> void:
 		fullscreen = false
 		_load_settings("res://build/test_save.cfg")
 		assert(best == 1234 and is_equal_approx(music_volume, 0.3) and is_equal_approx(sfx_volume, 0.8))
+		assert(is_equal_approx(master_volume, 0.6))
+		var legacy := ConfigFile.new()
+		assert(legacy.load("res://build/test_save.cfg") == OK)
+		legacy.erase_section_key("audio", "master")
+		assert(legacy.save("res://build/test_save.cfg") == OK)
+		_load_settings("res://build/test_save.cfg")
+		assert(is_equal_approx(master_volume, 1.0))
+		volume_drag = 0
+		_drag_volume(_volume_slider_rect(0).position.x - 10)
+		assert(master_volume == 0 and AudioServer.is_bus_mute(0))
+		_drag_volume(_volume_slider_rect(0).end.x + 10)
+		assert(master_volume == 1 and not AudioServer.is_bus_mute(0))
+		assert(is_equal_approx(music.volume_linear, music_volume))
+		volume_drag = -1
 		assert(selected_track == 2 and fullscreen and not shuffle_music)
 		DirAccess.remove_absolute("res://build/test_save.cfg")
 	print("SMOKE TEST PASSED: gameplay (%d misses), %d tracks, 48 randomized rounds, %d external cat palettes, indexed roles, cached textures, all animation frames, manual selection, saved preferences." % [simulated_misses, TRACKS.size(), cat_palettes.size()])

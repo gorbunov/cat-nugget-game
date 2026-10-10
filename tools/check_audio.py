@@ -28,4 +28,7 @@ if __name__ == '__main__':
     for song in SONGS:
         assert inspect(song['file']) == inspect(song['file'] + '_panic'), 'Stem durations differ'
         assert (ASSETS / (song['file'] + '.mid')).read_bytes().startswith(b'MThd')
-    print('AUDIO CHECK PASSED: five music tracks, finale layers, headroom, loop seams and MIDI headers.')
+    for reaction, minimum, maximum in [('eww', 1.99, 2.01), ('yay', 1.7, 2.0), ('nom', .2, .4)]:
+        frames = inspect('reaction_' + reaction)
+        assert minimum < frames / SR < maximum, f'{reaction}: unexpected selected clip duration'
+    print('AUDIO CHECK PASSED: music, finale layers, reactions, headroom, loop seams and MIDI headers.')

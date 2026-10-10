@@ -11,6 +11,18 @@ func _run() -> void:
 	root.add_child(game)
 	game.clock = 1.0
 	await _capture(game, "title")
+	if "--sources" in OS.get_cmdline_user_args():
+		game._action("sources")
+		assert(game.state == "sources")
+		await _capture(game, "sources")
+		game._action("back")
+		assert(game.state == "title")
+		game._action("sources")
+		var escape := InputEventKey.new()
+		escape.keycode = KEY_ESCAPE
+		escape.pressed = true
+		game._input(escape)
+		assert(game.state == "title")
 	if "--nuggets" in OS.get_cmdline_user_args():
 		game._action("guide")
 		await _capture(game, "nugget_guide")
@@ -34,6 +46,10 @@ func _run() -> void:
 			nugget.rotation = 0.2
 			game.nuggets.append(nugget)
 		await _capture(game, "nugget_types")
+		for frame in range(4):
+			for nugget in game.nuggets:
+				nugget.age = frame * 0.15
+			await _capture(game, "nugget_glitter_%02d" % frame)
 	if "--hands" in OS.get_cmdline_user_args():
 		game.hands.clear()
 		game.nuggets.clear()

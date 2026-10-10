@@ -1,7 +1,22 @@
-# Nugget Cat · 0.11.1
+# Nugget Cat · 0.11.5
 
 A tiny, original pixel-art arcade game for Godot 4.7.2 and macOS.
 An orange cat. Sixty seconds. An unreasonable amount of chicken.
+
+## Why we made this
+
+This game was made together with my kid as a hands-on way to learn how to plan
+a hobby project, iterate on ideas, and follow through to a finished, playable
+result. The process of making something together is as important as the game.
+
+**AI disclosure:** This game uses AI-generated images and music. The character,
+hand and nugget artwork was generated with AI and processed into game-ready
+sprites; the music was made through AI-assisted composition and synthesis scripts.
+The crowd reactions and gulp are separately sourced CC0 recordings, credited in
+the sound references below and in the in-game Sources panel.
+
+This project background and AI disclosure should accompany the game if we
+publish or share it publicly.
 
 ## Play
 
@@ -9,9 +24,14 @@ Open **`build/Nugget Cat.app`**, or import `project.godot` in Godot and press **
 
 - **Mouse:** move the cat's mouth; catches happen automatically.
 - **Enter / Space:** start a round or replay from results.
-- **Escape:** pause/resume. The game also pauses when it loses focus.
+- **Escape:** quit from the title screen, pause/resume during a round, or close a settings/guide/sources panel. The game also pauses when it loses focus.
 - **F11 / Option+Return:** toggle fullscreen. On keyboards with media keys, use **Fn+F11**.
-- **Settings:** fullscreen toggle, music selection, and separate music/effects volumes.
+- **Settings:** fullscreen toggle, music selection, and Master/Music/Sounds volume sliders.
+
+Click or drag a volume slider, or use its −/+ buttons. Master controls all audio
+and saves with the other preferences; zero mutes the game. Older saves default
+Master to 100%. Music now reaches full gain at 100%, with effects and crowd
+reactions balanced below it.
 
 Fullscreen switching during a round pauses the game so window changes never cost a
 catch. Press Escape or Keep Munching to continue. Windowed size and position are
@@ -127,6 +147,34 @@ three times, 0.2 seconds apart; bite progress is retained if you move away. Each
 bite slows it down and its three pips show progress. Missing edible food resets
 the combo and golden bonus. Letting burnt food fly away has no penalty. Burnt
 nuggets remain on screen during a golden collection wave; the wave never eats them.
+
+Burnt catches play the first two seconds of IENBA's **Small crowd reactions**;
+either golden type plays zut50's **Yay!**; finishing a big regular plays
+gary_in_wv's **Cartoony Gulp**. Reactions follow effects volume; collection waves
+keep a single cheer. All three recordings are CC0; source links and license
+details are retained in `art_sources/reactions.json` alongside their high-quality
+Freesound MP3 previews. Prepare the bundled WAVs offline with
+`python3 tools/generate_reactions.py` (requires macOS `afconvert`). Conversion
+preserves natural pitch and timing, applies peak normalization and tiny edge fades.
+
+#### Sound credits and references
+
+The title screen's **Sources** panel credits the creators and links to each sound
+and its license. These recordings are released under
+[CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/), permitting commercial
+use and modification without required attribution.
+
+| Use | Recording | Creator | Edit |
+|---|---|---|---|
+| Burnt nugget | [Small crowd reactions](https://freesound.org/people/IENBA/sounds/488472/) | IENBA | First 2 seconds |
+| Golden / big golden | [yay.mp3](https://freesound.org/people/zut50/sounds/162395/) | zut50 | Full clip |
+| Big regular | [gulpCartoony.mp3](https://freesound.org/people/gary_in_wv/sounds/449868/) | gary_in_wv | Full clip |
+
+All three are converted to mono WAV with normalized peaks and tiny edge fades;
+pitch is unchanged. `art_sources/reactions.json` retains the source-page URLs,
+download URLs, license references and clip boundaries for future documentation.
+Preview the in-game credits with
+`/Applications/Godot.app/Contents/MacOS/Godot --path . --script tools/preview.gd -- --sources`.
 
 Big regulars unlock after 4 seconds, burnt after 8, and golden after 12. Until a
 type unlocks, its share becomes regular nuggets. The percentages in the table
@@ -266,8 +314,9 @@ Try a full round and a replay. Feedback for the next iteration:
 3. Should the cat be bigger, floppier, or more unhinged?
 4. Does the chiptune feel cheerful or get repetitive?
 
-All game art, font glyphs, melody, and sound effects are generated specifically
-for this project; no downloaded art/music packs or external Python libraries.
+Game art, font glyphs, melodies and synthesized effects are generated specifically
+for this project; crowd/gulp reactions use the credited CC0 recordings above.
+Python tools require no external libraries.
 The v0.7 hands were generated with OpenAI's `gpt-image-2.5-flare`, then processed
 locally into three aligned 64×48 pixel-art frames: ready, wind-up and release.
 The original PNG and non-secret request metadata are retained in `art_sources/`.

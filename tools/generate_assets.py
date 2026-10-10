@@ -187,6 +187,7 @@ glyphs = {
 ' ':['000']*7,
 "'":['1','1','0','0','0','0','0'],
 '%':['11001','11010','00100','00100','01000','10110','00110'],
+'_':['00000','00000','00000','00000','00000','00000','11111'],
 }
 font_image = Image(16*8, 6*10)
 lines = ['info face="SnackPixel" size=8 bold=0 italic=0 charset="" unicode=1 stretchH=100 smooth=0 aa=1 padding=0,0,0,0 spacing=1,1', 'common lineHeight=10 base=8 scaleW=128 scaleH=60 pages=1 packed=0', 'page id=0 file="pixel_font.png"', f'chars count={len(glyphs)}']
