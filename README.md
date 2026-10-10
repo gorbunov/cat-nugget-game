@@ -10,7 +10,7 @@ a hobby project, iterate on ideas, and follow through to a finished, playable
 result. The process of making something together is as important as the game.
 
 **AI disclosure:** This game uses AI-generated images and music. The character,
-hand and nugget artwork was generated with AI and processed into game-ready
+hand, nugget and room artwork was generated with AI and processed into game-ready
 sprites; the music was made through AI-assisted composition and synthesis scripts.
 The crowd reactions and gulp are separately sourced CC0 recordings, credited in
 the sound references below and in the in-game Sources panel.
@@ -26,6 +26,7 @@ Open **`build/Nugget Cat.app`**, or import `project.godot` in Godot and press **
 - **Enter / Space:** start a round or replay from results.
 - **Escape:** quit from the title screen, pause/resume during a round, or close a settings/guide/sources panel. The game also pauses when it loses focus.
 - **F11 / Option+Return:** toggle fullscreen. On keyboards with media keys, use **Fn+F11**.
+- **Start-screen square expand/contract icon:** switch fullscreen mode with one click.
 - **Settings:** fullscreen toggle, music selection, and Master/Music/Sounds volume sliders.
 
 Click or drag a volume slider, or use its −/+ buttons. Master controls all audio
@@ -124,8 +125,36 @@ cached and reused; there is no recoloring work during animation playback.
 
 Regular catches earn 10 points times your multiplier. Every five consecutive catches
 raises the multiplier for subsequent catches, up to ×5. A miss resets the combo
-without subtracting points. The last ten seconds are **SNACK PANIC!**
-Nuggets still airborne at the buzzer are discarded, not counted as misses.
+without subtracting points. The last **15 seconds** are a **BOSS NUGGET** encounter.
+New throws stop at 41 seconds, letting existing food be eaten or fly away naturally.
+A **BOSS IN 3... 2... 1...** warning and rising sound cues announce the transition
+at 45 seconds; the finale music layer joins when the boss arrives. Any lingering
+food clears without an extra miss penalty. The larger 96-pixel boss moves faster
+and bounces off the playfield edges. Put the mouth anywhere on its visible food
+to take 40 automatic bites—there is no center target. Bite holes are not food.
+Biting ramps from 3 to 8 chomps per second over three seconds of contact. Brief
+slips preserve speed for 0.25 seconds; longer gaps gradually cool it down. Damage
+persists, but bites never accumulate while away. Perfect tracking takes about six
+seconds. Finishing awards a fixed 500-point bonus and freezes the countdown for
+a three-second, palette-matched upright belly dance, which loops on results.
+If time runs out, the boss escapes and you keep your earlier score.
+The exclusive boss-win dance uses an eight-pose OpenAI-generated sprite sheet,
+converted offline to a 96×96 palette-indexed atlas. It includes raised paws,
+hip sways, a belly-forward pose and a happy blink in all seven cat palettes.
+The retained source and request metadata are `art_sources/cat_dance_v001.png`
+and `.json`; `assets/cat_dance_sprite.json` defines the frame geometry and roles.
+Rebuild it offline with:
+
+```sh
+/Applications/Godot.app/Contents/MacOS/Godot --headless --path . --script tools/prepare_cat_dance.gd
+/Applications/Godot.app/Contents/MacOS/Godot --headless --path . --editor --import --quit
+/Applications/Godot.app/Contents/MacOS/Godot --path . --script tools/preview.gd -- --boss
+```
+
+Keep `assets/cat_dance_indexed.png` lossless with mipmaps and alpha-border fixing
+disabled, just like the gameplay cat atlas. To request a new candidate, use
+`python3 tools/generate_ai_art.py --asset cat_dance --quality high --name cat_dance_v002`
+(one billed request); selecting a new source requires updating the converter.
 At the end of each round, your cat celebrates with a looping victory dance:
 hops, squishy landings, side-to-side wiggles, turns, silly expressions and sparkles.
 The same cat, name, fur and eye palette carry through to the results screen.
@@ -179,8 +208,8 @@ Preview the in-game credits with
 Big regulars unlock after 4 seconds, burnt after 8, and golden after 12. Until a
 type unlocks, its share becomes regular nuggets. The percentages in the table
 apply after the warm-up; rare big-golden spawns replace an ordinary throw.
-An eligible round gets one big golden between 18–42 seconds. Only 0.5% of those
-rounds get a second at 45–53 seconds: **0.09% of all rounds**, about 1 in 1,100.
+An eligible round gets one big golden between 18–34 seconds. Only 0.5% of those
+rounds get a second at 36–38 seconds: **0.09% of all rounds**, about 1 in 1,100.
 There are never more than two. Golden bonuses do not inflate the actual catch streak.
 
 The six-frame `assets/nuggets.png` atlas includes two regular shapes and the four
@@ -189,6 +218,44 @@ then cropped, scaled and palette-reduced into crisp 32px frames. The original
 sheet and enlarged game-ready preview are retained at
 `art_sources/nuggets_v001.png` and `art_sources/nuggets_v001_pixel_preview.png`.
 The local generation tool remains available as an offline fallback.
+
+Big regular and big golden nuggets now show actual missing bites and pale exposed
+centers after each chomp. The separate `assets/nugget_bites.png` atlas is derived
+offline from the active sprites by `tools/prepare_nugget_bites.gd`; regenerate it
+after replacing `assets/nuggets.png`. The bite shape rotates with the nugget and
+persists if the cat moves away before finishing it.
+
+### Randomized pixel-art rooms
+
+Sage Kitchen, Strawberry Cafe, Sunroom and Moonlit Study each use an individual
+1536×1024 OpenAI image generated at high quality. The selected sources are
+`art_sources/room_{kitchen,cafe,sunroom,study}_v002.png`, with prompts and non-secret
+request metadata retained alongside them. `tools/prepare_rooms.gd` converts these
+directly to native 640×360 room frames in `assets/rooms.png`, preserving the source
+material colors and fine detail. Runtime integer scaling uses nearest filtering.
+The muted sage, pink, botanical and lavender themes keep scenery quieter than the
+cat and food. The original four-room candidate remains in `art_sources/rooms_v001.png`.
+
+Each round chooses a different room without immediate repeats, with randomized
+left/right furniture orientation. It stays fixed through pause and results;
+scenery randomness is independent of gameplay randomness.
+
+```sh
+# Offline conversions (no API request).
+/Applications/Godot.app/Contents/MacOS/Godot --headless --path . --script tools/prepare_rooms.gd
+/Applications/Godot.app/Contents/MacOS/Godot --headless --path . --script tools/prepare_nugget_bites.gd
+/Applications/Godot.app/Contents/MacOS/Godot --headless --path . --editor --import --quit
+# Actual game screenshots, including all bite stages against every room.
+/Applications/Godot.app/Contents/MacOS/Godot --path . --script tools/preview.gd -- --rooms --bites
+# Verify the start-screen toggle and capture rooms at actual fullscreen size.
+/Applications/Godot.app/Contents/MacOS/Godot --path . --script tools/preview.gd -- --rooms --check-title-fullscreen
+```
+
+To generate another room candidate, use
+`python3 tools/generate_ai_art.py --asset rooms --room kitchen --quality high --name room_kitchen_v003`
+(one billed request, no automatic retries). Room choices are `kitchen`, `cafe`,
+`sunroom` and `study`. Inspect it, then update `SOURCES` in
+`tools/prepare_rooms.gd` to activate it via the offline conversion.
 
 ### Difficulty and musical pace
 
@@ -205,6 +272,9 @@ shared smooth curve:
 | 60 seconds | 0.30 s | 0.68 s | 1.20× |
 
 Throws have ±8% timing variation, with the same readable wind-up throughout.
+New throws stop at 41 seconds; the boss arrives at 45 seconds.
+Throw intervals and flight times apply only to ordinary food;
+the music continues its speed ramp during the boss encounter.
 Music speed and pitch rise together for an arcade-style build-up; the main tune
 and finale layer use the same rate. Settings previews, results, and title music
 return to normal speed. Resuming restores the current round's musical pace.
@@ -229,18 +299,20 @@ location (`~/Library/Application Support/Godot/app_userdata/Nugget Cat/`).
 | `tools/compose_music.py` | Four additional compositions, MIDI sources and matching finale layers |
 | `tools/check_audio.py` | Checks music format, headroom, loop boundaries and matching stem durations |
 | `tools/generate_ai_hands.py` | One OpenAI Image API request; reads `OPENAI_API_KEY` from the environment |
-| `tools/generate_ai_art.py` | Shared API generator for hand and cat sheets; one candidate per request |
+| `tools/generate_ai_art.py` | Shared API generator for hand, cat, nugget and room sheets; one candidate per request |
 | `tools/prompts/hands.txt` | Art direction and pose/layout prompt |
 | `tools/prompts/cat.txt` | Eight cat expressions and source color-role instructions |
 | `tools/prepare_hands.gd` | Offline cleanup, 14-color palette reduction and wrist alignment |
 | `tools/prepare_cat.gd` | Offline cat alignment, semantic index map, palette preview and app icon |
 | `tools/generate_nugget_sprites.gd` | Local six-frame nugget art for offline playtests |
 | `tools/prepare_nuggets.gd` | Convert the API nugget sheet into the same game atlas |
+| `tools/prepare_nugget_bites.gd` | Derive transparent bite stages from the active big nugget sprites |
+| `tools/prepare_rooms.gd` | Convert the API room sheet to pixel-grid backgrounds with muted palettes |
 | `tools/test_nuggets.gd` | Multi-chomp, hazard, buff, sweep and probability integration checks |
 | `tools/test_smoke.gd` | Round, music, palette, persistence and navigation checks; invoked with `--smoke-test` |
 | `art_sources/` | Generated source, request metadata and enlarged sprite preview; ignored by Godot |
 | `tools/fetch_template.py` | Fetch matching macOS template into this project using HTTP byte ranges |
-| `tools/preview.gd` | Render five actual game screens for inspection |
+| `tools/preview.gd` | Render actual game screens; `--rooms --bites` covers scenery and bite stages |
 | `export_presets.cfg` | Local macOS export configuration |
 | `build/` | App, zip, export template, and preview screenshots; ignored by Godot |
 

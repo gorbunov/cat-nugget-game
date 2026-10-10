@@ -1,7 +1,7 @@
 # Repository guidance
 
 ## Project context and publication
-- Cross-platform publishing roadmap: `RELEASE_PLAN.md`. It is deferred until the next gameplay-polish round is complete; resume at Step 1 when requested.
+- Cross-platform publishing roadmap: `RELEASE_PLAN.md`. Gameplay polish passed user playtesting on 2026-10-10; resume at Step 1 when requested.
 - This is a parent-and-child hobby project, made to teach planning, iteration and following through to a playable result. Preserve this context in README and future publication materials.
 - When preparing a public release, store page or announcement, carry forward README's AI-generated images/music disclosure and the third-party sound credits (`art_sources/reactions.json`). The crowd/gulp recordings are CC0 sources, not AI-generated audio.
 

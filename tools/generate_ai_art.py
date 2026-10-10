@@ -1,4 +1,4 @@
-"""Generate one sprite-sheet candidate with OpenAI's Image API.
+"""Generate one sprite or room-sheet candidate with OpenAI's Image API.
 
 Uses OPENAI_API_KEY or the project's macOS Keychain entry. Saves the source image, prompt and
 non-secret response metadata inside this project. No automatic paid retries.
@@ -39,10 +39,14 @@ def read_api_key():
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--model', default='gpt-image-2.5-flare')
-    parser.add_argument('--asset', choices=['hands', 'cat', 'nuggets'], default='hands')
+    parser.add_argument('--asset', choices=['hands', 'cat', 'cat_dance', 'nuggets', 'rooms'], default='hands')
     parser.add_argument('--name', default=None)
+    parser.add_argument('--quality', choices=['low', 'medium', 'high'], default='medium')
+    parser.add_argument('--room', choices=['kitchen', 'cafe', 'sunroom', 'study'], help='Generate one detailed room rather than a four-room sheet')
     parser.add_argument('--check-key', action='store_true', help='Check credential availability without displaying the key or making an API request')
     args = parser.parse_args()
+    if args.room and args.asset != 'rooms':
+        parser.error('--room requires --asset rooms')
     args.name = args.name or args.asset + '_v001'
     if Path(args.name).name != args.name or not args.name:
         parser.error('--name must be a plain filename stem')
@@ -56,15 +60,18 @@ def main():
     if destination.exists():
         sys.exit(f'{destination.name} already exists; use a new --name to keep the original.')
     prompt = (ROOT / 'tools' / 'prompts' / (args.asset + '.txt')).read_text()
+    if args.room:
+        prompt = (ROOT / 'tools' / 'prompts' / 'rooms_hd.txt').read_text() + '\n\n' + (ROOT / 'tools' / 'prompts' / ('room_' + args.room + '.txt')).read_text()
+    background = 'opaque' if args.asset == 'rooms' else 'transparent'
     payload = dict(model=args.model, prompt=prompt, n=1, size='1536x1024',
-                   quality='medium', background='transparent', output_format='png')
+                   quality=args.quality, background=background, output_format='png')
     request = urllib.request.Request(
         'https://api.openai.com/v1/images/generations',
         data=json.dumps(payload).encode(),
         headers={'Authorization': 'Bearer ' + key, 'Content-Type': 'application/json'},
         method='POST',
     )
-    print(f'Requesting one transparent {args.asset} sheet with {args.model}...', flush=True)
+    print(f'Requesting one {background} {args.asset} sheet with {args.model}...', flush=True)
     try:
         with urllib.request.urlopen(request, timeout=240) as response:
             result = json.load(response)

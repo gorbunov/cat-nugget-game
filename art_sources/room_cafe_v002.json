@@ -1,0 +1,27 @@
+{
+  "request": {
+    "model": "gpt-image-2.5-flare",
+    "prompt": "Create ONE exceptionally well-crafted pixel-art room background for a finished cozy indie game. One complete room fills the entire opaque 1536x1024 canvas. NOT a collage, atlas, split screen or contact sheet. No characters, people, cats, flying food, UI, letters, numbers, logos or borders.\n\nThis is a higher-quality remake of a cozy pastel game room, preserving its layout and mood but replacing blurry, noisy, washed-out illustration with confident, deliberate PIXEL ART. Target the craftsmanship of premium modern pixel-art adventure games: clean contiguous pixel clusters, sharply defined stepped contours, readable silhouettes, carefully constructed material shading, subtle reflected light, controlled local contrast. Every object must be clear and attractive when downsampled to 640x360 and then integer-upscaled on a large monitor. A full 640x360 logical-pixel scene, NOT 320x180 and NOT a tiny retro thumbnail. Use fine purposeful details, not coarse blocky blobs. Render the pixel clusters SHARP, with no blur or soft brush texture. No film grain, speckles, random dithering, haze, chalkiness, watercolor, painterly strokes, JPEG artifacts or dirty patina. Large wall areas should be clean, quiet flat colors. Restrained high-quality pixel art, not a filtered photograph or a pixelated painting.\n\nUse harmonious muted pastel colors as specified below, but keep enough local tonal separation to clearly distinguish curtains, window frames, wood trim, furniture cushions and individual leaves. Rich material ramps, typically 4-6 clear shades per material. Do not reduce the entire scene to 8 or 24 similar colors. No dark black outlines; outline furniture with a related muted shade. Backgrounds should be quieter and lighter than the game's strongly outlined cat and orange nuggets. Preserve a broad uncluttered central play area. The visual interest is primarily on side walls, inside the window, and along the lower edge. No dramatic shafts of light or bright glowing bloom.\n\nStraight-on 2D camera, looking directly at the back wall, with a shallow floor strip along the bottom. No isometric perspective, no dollhouse view. Plan for a wide 16:9 final game frame: do not use tall narrow furniture, and leave the upper 15 percent of the picture quiet (a HUD will cover it). Whole room inside frame, objects arranged close to the supplied description. Aim for clean elegant architecture, detailed coherent decor, and warm lived-in charm. The final composition will be resized to 640x360: make small decor read at that size.\n\n\nROOM: STRAWBERRY CAFE. Straight-on dusty pink cafe, broad open center wall with clean pale vertical wallpaper stripes and low wainscoting. At left, a large picture window with a scalloped cream-and-sage awning, a quiet distant town outside, a small round cream cafe table under it with a blue-and-cream ceramic flower vase, two bentwood chairs. At right, a cream-framed decorative menu board containing only a few abstract pale dash marks and a tiny floral ornament, NO text. Beneath it a comfortable rounded sage loveseat with a little pale floral cushion. A potted leafy plant at far right. Dusty rose floorboards along bottom. Cafe furniture and window framing are precise high-quality pixel art; the central wall is intentionally quiet and empty. Soft warm afternoon light.\nPalette anchors: wall #e3c9c5, stripes #d5b9b6, wood #bc9f98, shadows #9d8584, cream #f7e4cf, sky #d4d7dd, distant view #b5bac6, upholstery #b8c7ba. Use related muted shades, keeping actual sage upholstery distinguishable from the pink room. Preserve the strawberry-pink and sage color identity.\n",
+    "n": 1,
+    "size": "1536x1024",
+    "quality": "high",
+    "background": "opaque",
+    "output_format": "png"
+  },
+  "request_id": "req_b4f2bdf1e47f42139264b90a4acd395f",
+  "created": 1791628151,
+  "usage": {
+    "input_tokens": 779,
+    "input_tokens_details": {
+      "image_tokens": 0,
+      "text_tokens": 779
+    },
+    "output_tokens": 1372,
+    "output_tokens_details": {
+      "image_tokens": 1372,
+      "text_tokens": 0
+    },
+    "total_tokens": 2151
+  },
+  "revised_prompt": null
+}

@@ -11,6 +11,17 @@ func _run() -> void:
 	root.add_child(game)
 	game.clock = 1.0
 	await _capture(game, "title")
+	if "--title-snacks" in OS.get_cmdline_user_args():
+		game.title_snack_wait = 0
+		game._update_title_snack(0)
+		game._update_title_snack(0.12)
+		await _capture(game, "title_snack_spawn")
+		game._update_title_snack(0.58)
+		await _capture(game, "title_snack_chomp")
+		game._update_title_snack(0.3)
+		await _capture(game, "title_snack_eaten")
+	if "--check-title-fullscreen" in OS.get_cmdline_user_args():
+		await _check_title_fullscreen(game)
 	if "--sources" in OS.get_cmdline_user_args():
 		game._handle_action("sources")
 		assert(game.state == game.Screen.SOURCES)
@@ -34,13 +45,42 @@ func _run() -> void:
 		game._step(1.0 / 60.0)
 	game._catch(Vector2(340, 210))
 	await _capture(game, "gameplay")
+	if "--boss" in OS.get_cmdline_user_args():
+		game.remaining = game.BOSS_DURATION + 2.5
+		await _capture(game, "boss_warning")
+		game.remaining = game.BOSS_DURATION
+		game._start_boss()
+		game.cat = Vector2(245, 240)
+		for hp in [40, 26, 12]:
+			game.boss_hp = hp
+			await _capture(game, "boss_%02d" % hp)
+		game.boss_defeated = true
+		game.round_phase = game.RoundPhase.CELEBRATING
+		game.boss_hp = 0
+		game.celebration_time = 0.7
+		game.banner_time = 0
+		await _capture(game, "boss_celebration")
+		game._finish_round()
+		for palette in range(game.cat_palettes.size()):
+			game._select_cat(palette)
+			game.results_time = palette * 0.13
+			await _capture(game, "boss_dance_%02d" % palette)
+		game._start_round()
 	if "--rooms" in OS.get_cmdline_user_args():
+		var check_fullscreen := "--check-title-fullscreen" in OS.get_cmdline_user_args()
+		if check_fullscreen:
+			game._toggle_fullscreen()
+			await create_timer(1.2).timeout
 		game.hands.clear()
 		game.nuggets.clear()
 		game.particles.clear()
 		game.popups.clear()
 		game.banner_time = 0
 		game.cat = Vector2(320, 230)
+		for kind in ["regular", "big", "burnt", "golden", "big_golden"]:
+			var nugget = game._make_nugget(kind, Vector2(100 + game.nuggets.size() * 110, 135), Vector2.ZERO, 0)
+			nugget.rotation = 0.2
+			game.nuggets.append(nugget)
 		var board := Image.create(1280, 720, false, Image.FORMAT_RGBA8)
 		for i in range(game.room.NAMES.size()):
 			game._change_screen(game.Screen.PLAYING)
@@ -53,6 +93,9 @@ func _run() -> void:
 			screen.resize(640, 360, Image.INTERPOLATE_NEAREST)
 			board.blit_rect(screen, Rect2i(0, 0, 640, 360), Vector2i((i % 2) * 640, (i / 2) * 360))
 		board.save_png("res://build/previews/rooms.png")
+		if check_fullscreen:
+			game._toggle_fullscreen()
+			await create_timer(1.2).timeout
 	if "--nuggets" in OS.get_cmdline_user_args():
 		game.hands.clear()
 		game.nuggets.clear()
@@ -69,6 +112,24 @@ func _run() -> void:
 			for nugget in game.nuggets:
 				nugget.age = frame * 0.15
 			await _capture(game, "nugget_glitter_%02d" % frame)
+	if "--bites" in OS.get_cmdline_user_args():
+		game.hands.clear()
+		game.nuggets.clear()
+		game.particles.clear()
+		game.popups.clear()
+		game.banner_time = 0
+		game.cat = Vector2(320, 280)
+		for row in range(2):
+			for stage in range(3):
+				var nugget = game._make_nugget("big" if row == 0 else "big_golden", Vector2(200 + stage * 120, 120 + row * 95), Vector2.ZERO, 0)
+				nugget.hp = 3 - stage
+				nugget.rotation = 0
+				game.nuggets.append(nugget)
+		for room in range(game.room.NAMES.size()):
+			game._change_screen(game.Screen.PLAYING)
+			game.room.index = room
+			game.room.variation = 0
+			await _capture(game, "bites_room_%02d" % room)
 	if "--hands" in OS.get_cmdline_user_args():
 		game.hands.clear()
 		game.nuggets.clear()
@@ -118,6 +179,23 @@ func _run() -> void:
 	print("Rendered preview screens in build/previews.")
 	quit()
 
+func _check_title_fullscreen(game: Node2D) -> void:
+	var original_size := root.size
+	var chosen_room: int = game.room.index
+	var button: Rect2 = game.ScreenLayout.button_rect(game.Screen.TITLE, "fullscreen")
+	assert(game.ScreenLayout.action_at(game.Screen.TITLE, button.get_center()) == "fullscreen")
+	game._activate_button_at(button.get_center())
+	await create_timer(1.2).timeout
+	assert(game.fullscreen and root.mode == Window.MODE_FULLSCREEN)
+	assert(game.state == game.Screen.TITLE and game.room.index == chosen_room)
+	await _capture(game, "title_fullscreen")
+	game._activate_button_at(button.get_center())
+	await create_timer(1.2).timeout
+	assert(not game.fullscreen and root.mode == Window.MODE_WINDOWED and root.size == original_size)
+	assert(game.state == game.Screen.TITLE)
+	await _capture(game, "title_windowed")
+	print("TITLE FULLSCREEN CHECK: button hit testing, fullscreen entry, window-size restoration, title/room preserved.")
+
 func _check_settings(game: Node2D) -> void:
 	# Toggle through both shortcuts using the actual window, without saving test preferences.
 	var original_size := root.size
@@ -137,6 +215,7 @@ func _check_settings(game: Node2D) -> void:
 	assert(root.mode == Window.MODE_WINDOWED and root.size == original_size)
 	# Preview music from pause, then return to a paused game.
 	game.remaining = 8
+	game._start_boss()
 	game._handle_action("settings")
 	for i in range(game.TRACKS.size()):
 		game._select_track(i)

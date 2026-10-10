@@ -1,0 +1,27 @@
+{
+  "request": {
+    "model": "gpt-image-2.5-flare",
+    "prompt": "Create ONE exceptionally well-crafted pixel-art room background for a finished cozy indie game. One complete room fills the entire opaque 1536x1024 canvas. NOT a collage, atlas, split screen or contact sheet. No characters, people, cats, flying food, UI, letters, numbers, logos or borders.\n\nThis is a higher-quality remake of a cozy pastel game room, preserving its layout and mood but replacing blurry, noisy, washed-out illustration with confident, deliberate PIXEL ART. Target the craftsmanship of premium modern pixel-art adventure games: clean contiguous pixel clusters, sharply defined stepped contours, readable silhouettes, carefully constructed material shading, subtle reflected light, controlled local contrast. Every object must be clear and attractive when downsampled to 640x360 and then integer-upscaled on a large monitor. A full 640x360 logical-pixel scene, NOT 320x180 and NOT a tiny retro thumbnail. Use fine purposeful details, not coarse blocky blobs. Render the pixel clusters SHARP, with no blur or soft brush texture. No film grain, speckles, random dithering, haze, chalkiness, watercolor, painterly strokes, JPEG artifacts or dirty patina. Large wall areas should be clean, quiet flat colors. Restrained high-quality pixel art, not a filtered photograph or a pixelated painting.\n\nUse harmonious muted pastel colors as specified below, but keep enough local tonal separation to clearly distinguish curtains, window frames, wood trim, furniture cushions and individual leaves. Rich material ramps, typically 4-6 clear shades per material. Do not reduce the entire scene to 8 or 24 similar colors. No dark black outlines; outline furniture with a related muted shade. Backgrounds should be quieter and lighter than the game's strongly outlined cat and orange nuggets. Preserve a broad uncluttered central play area. The visual interest is primarily on side walls, inside the window, and along the lower edge. No dramatic shafts of light or bright glowing bloom.\n\nStraight-on 2D camera, looking directly at the back wall, with a shallow floor strip along the bottom. No isometric perspective, no dollhouse view. Plan for a wide 16:9 final game frame: do not use tall narrow furniture, and leave the upper 15 percent of the picture quiet (a HUD will cover it). Whole room inside frame, objects arranged close to the supplied description. Aim for clean elegant architecture, detailed coherent decor, and warm lived-in charm. The final composition will be resized to 640x360: make small decor read at that size.\n\n\nROOM: MOONLIT STUDY. Light lavender and mauve reading room, straight-on view. At left a tall lavender bookcase with four or five shelves of orderly muted book spines, a small trailing plant, a blue-gray globe and two ceramic keepsakes. Center: a broad cream-lavender framed window with mauve pleated curtains tied back, a small cream crescent moon and sparse stars above distant quiet lavender rooftops. At right a comfy rounded mauve reading loveseat with a pale floral pillow; beside it a slim standing lamp with a cream pleated shade. One little framed lavender botanical print above the loveseat. Subtle wallpaper with only a few spaced-out sprigs, low wainscoting, lavender floorboards and a pale simple rug. Night atmosphere but the room remains light and readable, no dramatic dark corners or glow. Book spines, lamp pleats, furniture and curtain folds should have sharp deliberate pixel construction.\nPalette anchors: wall #bfc4d5, wallpaper detail #adb4c9, bookcase #9e9db5, shadows #7f819c, trim #ded9d9, sky #8e9bb9, rooftops #7d8faa, upholstery #b6a6ba. Add related material shades for clarity; preserve the light lavender palette, not saturated blue or deep purple.\n",
+    "n": 1,
+    "size": "1536x1024",
+    "quality": "high",
+    "background": "opaque",
+    "output_format": "png"
+  },
+  "request_id": "req_9a786e3d417a45e992dc08c2148bed3b",
+  "created": 1791628151,
+  "usage": {
+    "input_tokens": 799,
+    "input_tokens_details": {
+      "image_tokens": 0,
+      "text_tokens": 799
+    },
+    "output_tokens": 1372,
+    "output_tokens_details": {
+      "image_tokens": 1372,
+      "text_tokens": 0
+    },
+    "total_tokens": 2171
+  },
+  "revised_prompt": null
+}

@@ -16,11 +16,11 @@ var indices := PackedByteArray()
 var _lookups: Array[PackedByteArray] = []
 var _textures: Dictionary = {}
 
-func load_assets(source: Image = null) -> Error:
+func load_assets(source: Image = null, sprite_path: String = SPRITE_PATH) -> Error:
 	palettes.clear()
 	_lookups.clear()
 	_textures.clear()
-	var sprite: Variant = JSON.parse_string(FileAccess.get_file_as_string(SPRITE_PATH))
+	var sprite: Variant = JSON.parse_string(FileAccess.get_file_as_string(sprite_path))
 	var definitions: Variant = JSON.parse_string(FileAccess.get_file_as_string(PALETTES_PATH))
 	if not sprite is Dictionary or not definitions is Dictionary:
 		return _invalid("Cat sprite/palette JSON must contain objects.")

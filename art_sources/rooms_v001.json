@@ -1,0 +1,27 @@
+{
+  "request": {
+    "model": "gpt-image-2.5-flare",
+    "prompt": "Create a production game background atlas for a cozy 2D pixel-art cat-and-chicken-nuggets game. Output one opaque 1536x1024 image containing EXACTLY FOUR equal rectangular rooms in a seamless 2 by 2 grid: each cell is 768 wide and 512 high. Cell boundaries exactly at x=768 and y=512. No margins, gaps, labels, text, logos, UI, characters, cats, people, food flying through the air, or foreground objects. Each cell is a complete straight-on room background, not an isometric room or cutaway dollhouse. Each will be independently resized to a wide 640x360 game background.\n\nArt direction: authentic hand-placed 16-bit pixel art, chunky clean pixel clusters, intentional stair-step curves, 2-3 discrete shades per material, small restrained dither patches only, no smooth gradients, no antialiased vector look, no painterly brush strokes, no photorealism. Think lovingly detailed cozy SNES interiors. Draw at an apparent 320x180 logical-pixel resolution per room, then scale up with nearest neighbor. Beautiful material details: wood grain clusters, pleated curtains, textured ceramic pots, book spine bands, individual leaves, tufted upholstery. Pixel-art craft, not simple flat geometric placeholders.\n\nCRITICAL GAMEPLAY CONTRAST: these are quiet BACKGROUNDS behind dark-outlined moving characters. Use ONLY muted, light, dusty pastel colors with low internal contrast. No black outlines, dark brown or saturated yellow/gold/orange accents, very bright white patches, or high-contrast checkerboards. All outlines should be a slightly darker shade of the surrounding pastel. Even the nighttime room must remain light lavender, not dark. Keep the middle 40 percent of each room spacious and uncluttered, primarily quiet wall, with furniture and interesting objects toward left/right edges and bottom. Top 15 percent is quiet wall that will be covered by a HUD. Wall meets floor around 82 percent of room height. Leave generous open wall space above furniture. Overall values and colors must closely match these specified palettes.\n\nTOP LEFT: SAGE KITCHEN. Colors wall #cedbca, subtle tile seams #bdcebb, sage cabinets #adb8a0, muted shadows #859886, cream trim #f2e6cd, window sky #b8d7d5, distant garden #9bb9a5, linen curtains #d5b8a1. A central framed four-pane sunny garden window with curtains, a left wall shelf holding three ceramic jars, a small framed botanical print under it, right shelf with a potted herb and mug. Cream counter runs along the bottom over inset sage cabinet doors with little handles; folded striped towel hangs at far right. Warm homey kitchen, softly textured wall tiles and cabinetry.\n\nTOP RIGHT: STRAWBERRY CAFE. Colors wall #e3c9c5, wallpaper stripe #d5b9b6, dusty rose wood #bc9f98, shadows #9d8584, cream #f7e4cf, sky #d4d7dd, distant view #b5bac6, sage upholstery #b8c7ba. Large left window with a scalloped cream-and-sage cafe awning, a small round cafe table and ceramic flower vase below it. On right, a framed decorative menu board with abstract tiny pale lines only, NO lettering, and a cozy sage upholstered loveseat under it. Subtle vertical pink wallpaper, low wainscoting, dusty rose floorboards. The center wall is deliberately mostly empty.\n\nBOTTOM LEFT: SUNROOM. Colors wall #dce0c7, subtle detail #ccd2b9, pale olive wood #b7b89a, shadows #939b80, cream #f3e9cc, sky #c2dcd7, sage foliage #9fbea8, upholstery and rug #d7c59f. Wide central garden window with slender cream frames and pale linen curtains, pastel green layered garden outside. Side shelves hold distinct small plants with pixel-art leaves in textured pots. A taller plant at far bottom left, low woven rattan loveseat at bottom right, small cream striped woven rug along the bottom center. Airy botanical morning room, restrained foliage so objects in play stay visible.\n\nBOTTOM RIGHT: MOONLIT STUDY. Colors wall #bfc4d5, wallpaper #adb4c9, bookcase wood #9e9db5, shadows #7f819c, trim #ded9d9, sky #8e9bb9, distant rooftops #7d8faa, upholstery #b6a6ba. Tall filled lavender bookcase on left with four shelves of muted colored books, central curtained window showing a small cream crescent moon and a few tiny stars above distant rooftops, cushioned mauve reading loveseat at right beside a cream-shaded standing lamp. Pale lavender wainscoting and floorboards. Quiet magical bedtime atmosphere WITHOUT making the room dark or high-contrast.\n\nAll four must have the same pixel scale and flat front-facing camera, cohesive gentle colors, rich but controlled pixel craftsmanship, no characters, no borders between cells. Background art only.\n",
+    "n": 1,
+    "size": "1536x1024",
+    "quality": "medium",
+    "background": "opaque",
+    "output_format": "png"
+  },
+  "request_id": "req_22b273398dee4aa7ab39dac9fa3f5ee6",
+  "created": 1791626936,
+  "usage": {
+    "input_tokens": 1078,
+    "input_tokens_details": {
+      "image_tokens": 0,
+      "text_tokens": 1078
+    },
+    "output_tokens": 343,
+    "output_tokens_details": {
+      "image_tokens": 343,
+      "text_tokens": 0
+    },
+    "total_tokens": 1421
+  },
+  "revised_prompt": null
+}

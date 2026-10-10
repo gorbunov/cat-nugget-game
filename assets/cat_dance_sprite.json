@@ -1,0 +1,9 @@
+{
+  "texture": "res://assets/cat_dance_indexed.png",
+  "frame_size": [96, 96],
+  "frame_count": 8,
+  "draw_size": [96, 96],
+  "mouth_anchor": [48, 92],
+  "frames": ["center", "sway_left", "hip_left", "blink", "belly_forward", "sway_right", "hip_right", "shimmy"],
+  "roles": ["transparent", "outline", "fur_shadow", "fur", "fur_light", "belly_shadow", "belly", "iris", "iris_light", "accent", "accent_shadow", "white"]
+}

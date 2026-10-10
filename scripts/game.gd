@@ -7,6 +7,26 @@ const HAND_RELEASE_TIME := 0.72
 const HAND_LIFETIME := 1.15
 const CATCH_RADIUS := 18.0
 const CHOMP_INTERVAL := 0.20
+const BOSS_BITES := 40
+const BOSS_BONUS := 500
+const BOSS_SIZE := 96.0
+const BOSS_MOUTH_RADIUS := 6.0
+const BOSS_DURATION := 15.0
+const BOSS_WARNING := 3.0
+const THROW_WIND_DOWN := 4.0
+const BOSS_BOUNDS := Rect2(56, 142, 528, 108)
+const BOSS_VELOCITY := Vector2(110, 55)
+enum RoundPhase { CATCHING, BOSS, CELEBRATING }
+var round_phase := RoundPhase.CATCHING
+var boss_hp := BOSS_BITES
+var boss_age := 0.0
+var boss_pos := Vector2(320, 190)
+var boss_contact := 0.0
+var boss_gap := 0.0
+var boss_bite_progress := 0.0
+var boss_defeated := false
+var celebration_time := 0.0
+var boss_warning_second := 4
 const BIG_GOLD_ROUND_CHANCE := 0.18
 const SECOND_BIG_GOLD_CHANCE := 0.005
 const NUGGET_TYPES := {
@@ -50,15 +70,22 @@ const RoomBackground := preload("res://scripts/room_background.gd")
 
 # Assets and appearance (the chosen cat persists through pause and results).
 var cat_art := CatAppearance.new()
+var dance_art := CatAppearance.new()
+var dance_tex: Texture2D
+var boss_masks: Array[BitMap] = []
 var room := RoomBackground.new()
 var cat_palettes: Array[Dictionary] = []
 var cat_tex: Texture2D
 var nugget_tex: Texture2D = preload("res://assets/nuggets.png")
+var nugget_bite_tex: Texture2D = preload("res://assets/nugget_bites.png")
 var hand_tex: Texture2D = preload("res://assets/hands_ai.png")
 var font: Font = preload("res://assets/pixel_font.fnt")
 var cat_palette := 0
 var cat_name_index := -1
 var title_cat_selected := false
+var title_snack_rng := RandomNumberGenerator.new()
+var title_snack_wait := 5.5
+var title_snack: Nugget
 
 # Screen navigation and presentation time.
 var state: ScreenLayout.Screen = Screen.TITLE
@@ -124,6 +151,8 @@ var test_mode := false:
 func _ready() -> void:
 	texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 	random.randomize()
+	title_snack_rng.randomize()
+	title_snack_wait = title_snack_rng.randf_range(5.0, 6.0)
 	room.choose_next()
 	var smoke_requested := "--smoke-test" in OS.get_cmdline_user_args()
 	test_mode = test_mode or smoke_requested
@@ -131,6 +160,14 @@ func _ready() -> void:
 	if cat_art.load_assets() != OK:
 		get_tree().quit(1)
 		return
+	if dance_art.load_assets(null, "res://assets/cat_dance_sprite.json") != OK:
+		get_tree().quit(1)
+		return
+	for stage in range(1, 4):
+		var texture := nugget_tex if stage == 3 else nugget_bite_tex
+		var mask := BitMap.new()
+		mask.create_from_image_alpha(texture.get_image().get_region(Rect2i(_nugget_region("big", 0, stage))))
+		boss_masks.append(mask)
 	cat_palettes = cat_art.palettes
 	_select_cat(_random_choice(-1, cat_palettes.size()))
 	windowed_size = get_window().size
@@ -157,6 +194,7 @@ func _random_choice(current: int, count: int) -> int:
 func _select_cat(index: int) -> void:
 	cat_palette = index
 	cat_tex = cat_art.texture_for_palette(index)
+	dance_tex = dance_art.texture_for_palette(index)
 	cat_name_index = _random_choice(cat_name_index, CAT_NAMES.size())
 
 func _select_track(index: int) -> void:
@@ -369,6 +407,16 @@ func _drag_volume(pointer_x: float) -> void:
 
 func _start_round() -> void:
 	_change_screen(Screen.PLAYING)
+	round_phase = RoundPhase.CATCHING
+	boss_hp = BOSS_BITES
+	boss_age = 0.0
+	boss_pos = Vector2(320, 190)
+	boss_contact = 0.0
+	boss_gap = 0.0
+	boss_bite_progress = 0.0
+	boss_defeated = false
+	celebration_time = 0.0
+	boss_warning_second = 4
 	room.choose_next()
 	remaining = ROUND_LENGTH
 	_set_music_rate(1.0)
@@ -417,7 +465,7 @@ func _resume() -> void:
 	cat = get_global_mouse_position().clamp(Vector2(20, 62), Vector2(620, 326))
 	cat_previous = cat
 	audio.resume_music()
-	if remaining <= 10:
+	if round_phase == RoundPhase.BOSS:
 		_start_panic_music()
 
 func _finish_round() -> void:
@@ -444,11 +492,35 @@ func _process(delta: float) -> void:
 		_step(delta)
 	elif state == Screen.TITLE:
 		expression = maxf(0, expression - delta)
+		_update_title_snack(delta)
 	elif state == Screen.RESULTS:
 		results_time += delta
 	queue_redraw()
 
 func _step(delta: float) -> void:
+	if state != Screen.PLAYING:
+		return
+	if round_phase == RoundPhase.CELEBRATING:
+		celebration_time += delta
+		_update_effects(delta)
+		if celebration_time >= 3.0:
+			_finish_round()
+		return
+	# Split exactly at the phase boundary, including long frames.
+	if round_phase == RoundPhase.CATCHING and remaining - delta <= BOSS_DURATION:
+		var ordinary_time := maxf(0.0, remaining - BOSS_DURATION)
+		if ordinary_time > 0:
+			_step_catching(ordinary_time)
+		remaining = minf(remaining, BOSS_DURATION)
+		_start_boss()
+		_step(maxf(0.0, delta - ordinary_time))
+		return
+	if round_phase == RoundPhase.BOSS:
+		_step_boss(delta)
+		return
+	_step_catching(delta)
+
+func _step_catching(delta: float) -> void:
 	remaining = maxf(0, remaining - delta)
 	if remaining <= 0:
 		_finish_round()
@@ -470,10 +542,11 @@ func _update_round_feedback(delta: float) -> void:
 	offended = maxf(0, offended - delta)
 	banner_time = maxf(0, banner_time - delta)
 	sweep_time = maxf(0, sweep_time - delta)
-	if remaining <= 10 and last_second > 10:
-		banner = "SNACK PANIC!"
-		banner_time = 1.6
-		_start_panic_music()
+	if round_phase == RoundPhase.CATCHING and remaining <= BOSS_DURATION + BOSS_WARNING:
+		var warning_second := ceili(remaining - BOSS_DURATION)
+		if warning_second > 0 and warning_second < boss_warning_second:
+			boss_warning_second = warning_second
+			_sound("combo", 0.65 + (3 - warning_second) * 0.15)
 	if ceili(remaining) < last_second:
 		last_second = ceili(remaining)
 		if remaining <= 10:
@@ -481,6 +554,8 @@ func _update_round_feedback(delta: float) -> void:
 
 
 func _update_spawning(delta: float, throw_interval: float) -> void:
+	if remaining <= BOSS_DURATION + THROW_WIND_DOWN:
+		return
 	spawn_in -= delta
 	if spawn_in <= 0:
 		_spawn_hand()
@@ -542,9 +617,70 @@ func _swept_catch(nugget_before: Vector2, nugget_after: Vector2,
 func _plan_rare_spawns() -> void:
 	rare_spawn_times.clear()
 	if random.randf() < BIG_GOLD_ROUND_CHANCE:
-		rare_spawn_times.append(random.randf_range(18, 42))
+		rare_spawn_times.append(random.randf_range(18, 34))
 		if random.randf() < SECOND_BIG_GOLD_CHANCE:
-			rare_spawn_times.append(random.randf_range(45, 53))
+			rare_spawn_times.append(random.randf_range(36, 38))
+
+func _start_boss() -> void:
+	round_phase = RoundPhase.BOSS
+	nuggets.clear()
+	hands.clear()
+	rare_spawn_times.clear()
+	sweep_pending = false
+	sweep_time = 0.0
+	popups.clear()
+	banner = "BOSS NUGGET! HOLD YOUR MOUTH ON IT!"
+	banner_time = 2.0
+	_sound("combo", 0.65)
+	_start_panic_music()
+
+func _boss_position(age: float) -> Vector2:
+	# Analytic reflected motion cannot overshoot a wall, even on a long frame.
+	var travel := Vector2(320, 190) - BOSS_BOUNDS.position + BOSS_VELOCITY * age
+	return BOSS_BOUNDS.position + Vector2(pingpong(travel.x, BOSS_BOUNDS.size.x), pingpong(travel.y, BOSS_BOUNDS.size.y))
+
+func _step_boss(delta: float) -> void:
+	var elapsed := 0.0
+	# Small simulation slices integrate contact and bite speed independently of FPS.
+	while elapsed < delta and round_phase == RoundPhase.BOSS:
+		var dt := minf(1.0 / 240.0, minf(delta - elapsed, remaining))
+		if dt <= 0.0:
+			_finish_round()
+			return
+		elapsed += dt
+		boss_age += dt
+		boss_pos = _boss_position(boss_age)
+		var mouth := cat_previous.lerp(cat, elapsed / delta)
+		if _boss_contains_mouth(mouth):
+			boss_gap = 0.0
+			var before := boss_contact
+			boss_contact = minf(3.0, boss_contact + dt)
+			boss_bite_progress += dt * (3.0 + 5.0 * (before + boss_contact) / 6.0)
+			while boss_bite_progress >= 1.0 and boss_hp > 0:
+				boss_bite_progress -= 1.0
+				boss_hp -= 1
+				expression = 0.42
+				_sound("catch", 0.8 + boss_contact * 0.15)
+				for i in range(3):
+					particles.append({"pos": boss_pos, "vel": Vector2(random.randf_range(-65, 65), random.randf_range(-80, -20)), "life": 0.5, "size": 3, "color": GOLD})
+		else:
+			var old_gap := boss_gap
+			boss_gap += dt
+			boss_contact = maxf(0.0, boss_contact - 2.0 * (maxf(0.0, boss_gap - 0.25) - maxf(0.0, old_gap - 0.25)))
+			boss_bite_progress = 0.0
+		remaining = maxf(0.0, remaining - dt)
+		_update_round_feedback(dt)
+		_update_effects(dt)
+		if boss_hp == 0:
+			boss_defeated = true
+			round_phase = RoundPhase.CELEBRATING
+			score += BOSS_BONUS
+			_sound("reaction_yay")
+			banner_time = 0.0
+		elif remaining <= 0.0:
+			_finish_round()
+			return
+	_set_music_rate(_difficulty_at(ROUND_LENGTH - remaining).music_rate)
 
 func _next_nugget_kind() -> String:
 	var elapsed := ROUND_LENGTH - remaining
@@ -706,6 +842,20 @@ func _button(label: String, action: String, primary: bool = false) -> void:
 	draw_rect(Rect2(rect.position + Vector2(1, 1), rect.size - Vector2(2, 2)), CREAM if hover else color.lightened(0.18), false)
 	_text(label, rect.position + Vector2(rect.size.x / 2, (rect.size.y - 8) / 2 - 1), 8, INK if primary else CREAM, true)
 
+func _fullscreen_button() -> void:
+	_button("", "fullscreen")
+	var center := ScreenLayout.button_rect(state, "fullscreen").get_center()
+	# Four pixel corners point outward to expand, inward to restore the window.
+	for x in [-1, 1]:
+		for y in [-1, 1]:
+			var corner := center + Vector2(x, y) * (3 if fullscreen else 7)
+			var direction := 1 if fullscreen else -1
+			draw_polyline(PackedVector2Array([
+				corner + Vector2(x * direction * 5, 0),
+				corner,
+				corner + Vector2(0, y * direction * 5),
+			]), CREAM, 2)
+
 func _draw() -> void:
 	if cat_tex == null:
 		return
@@ -753,7 +903,10 @@ func _cat_frame() -> int:
 		return 1
 	return 6 if streak >= 15 else 0
 
-func _nugget_region(kind: String, variant: int = 0) -> Rect2:
+func _nugget_region(kind: String, variant: int = 0, hp: int = 3) -> Rect2:
+	if kind in ["big", "big_golden"] and hp < 3:
+		var bite_frame := (2 if kind == "big_golden" else 0) + (2 - clampi(hp, 1, 2))
+		return Rect2(bite_frame * 32, 0, 32, 32)
 	var frame: int = NUGGET_TYPES[kind].frame + (variant if kind == "regular" else 0)
 	return Rect2(frame * 32, 0, 32, 32)
 
@@ -783,13 +936,18 @@ func _golden_glitter(n: Nugget, size: float) -> void:
 func _draw_flying_nugget(n: Nugget) -> void:
 	var kind: String = n.kind
 	var spec: Dictionary = NUGGET_TYPES[kind]
-	var size: float = spec.size * (1.0 - (spec.hp - n.hp) * 0.08)
+	var size: float = spec.size
 	var golden := kind in ["golden", "big_golden"]
+	var texture := nugget_bite_tex if spec.hp == 3 and n.hp < 3 else nugget_tex
+	var sprite_rect := Rect2(Vector2.ONE * (-size / 2), Vector2.ONE * size)
+	var region := _nugget_region(kind, n.variant, n.hp)
 	if golden:
 		draw_circle(n.pos, size * 0.65, Color(1, 0.85, 0.25, 0.18))
-	draw_circle(n.pos + Vector2(3, 7), size * 0.38, Color(0.25, 0.22, 0.25, 0.12))
+	# The shadow loses the same chunks as the sprite, rather than filling its bite holes.
+	draw_set_transform(n.pos + Vector2(3, 7), n.rotation)
+	draw_texture_rect_region(texture, sprite_rect, region, Color(0.25, 0.22, 0.25, 0.12))
 	draw_set_transform(n.pos, n.rotation)
-	draw_texture_rect_region(nugget_tex, Rect2(Vector2.ONE * (-size / 2), Vector2.ONE * size), _nugget_region(kind, n.variant))
+	draw_texture_rect_region(texture, sprite_rect, region)
 	draw_set_transform(Vector2.ZERO)
 	if golden:
 		_golden_glitter(n, size)
@@ -823,6 +981,8 @@ func _playfield() -> void:
 			_text("!", pos + direction * 43 + Vector2(0, -8), 16, INK, true)
 	for n in nuggets:
 		_draw_flying_nugget(n)
+	if round_phase == RoundPhase.BOSS:
+		_draw_boss()
 	if sweep_time > 0:
 		var progress := 1.0 - sweep_time / 0.65
 		draw_arc(sweep_origin, lerpf(12, 650, progress), 0, TAU, 64, Color(1, 0.88, 0.4, (1 - progress) * 0.7), 3)
@@ -830,7 +990,12 @@ func _playfield() -> void:
 	draw_set_transform(Vector2(cat.x, 294), 0, Vector2(1, 0.25))
 	draw_circle(Vector2.ZERO, 22, Color(0.2, 0.25, 0.23, 0.13))
 	draw_set_transform(Vector2.ZERO)
-	_cat_sprite(cat, _cat_frame(), 1.5, tilt)
+	if round_phase == RoundPhase.CELEBRATING:
+		_belly_dance(Vector2(320, 285), celebration_time, 2.0)
+		draw_rect(Rect2(185, 64, 270, 28), INK)
+		_text("BOSS DEVOURED! +500", Vector2(320, 70), 16, GOLD, true)
+	else:
+		_cat_sprite(cat, _cat_frame(), 1.5, tilt)
 	# Quiet brackets mark the stable mouth target.
 	for sign_x in [-1, 1]:
 		for sign_y in [-1, 1]:
@@ -842,10 +1007,12 @@ func _playfield() -> void:
 		_text(popup.text, popup.pos + Vector2(1, 1), 8, INK, true)
 		_text(popup.text, popup.pos, 8, popup.color, true)
 	_hud()
-	if banner_time > 0:
-		var width := font.get_string_size(banner, HORIZONTAL_ALIGNMENT_LEFT, -1, 8).x + 28
+	var warning := round_phase == RoundPhase.CATCHING and remaining <= BOSS_DURATION + BOSS_WARNING and remaining > BOSS_DURATION
+	if banner_time > 0 or warning:
+		var message := "BOSS IN %d... FINISH YOUR SNACKS!" % ceili(remaining - BOSS_DURATION) if warning else banner
+		var width := font.get_string_size(message, HORIZONTAL_ALIGNMENT_LEFT, -1, 8).x + 28
 		draw_rect(Rect2(320 - width / 2, 64, width, 22), INK)
-		_text(banner, Vector2(320, 70), 8, GOLD if remaining > 10 else PINK, true)
+		_text(message, Vector2(320, 70), 8, PINK if warning or round_phase == RoundPhase.BOSS else GOLD, true)
 
 func _hud() -> void:
 	draw_rect(Rect2(0, 0, 640, 49), INK)
@@ -867,10 +1034,31 @@ func _hud() -> void:
 	_text("%s / %s" % [CAT_NAMES[cat_name_index], cat_palettes[cat_palette].name], Vector2(320, 345), 8, INK, true)
 	_text("ESC: SNACK BREAK", Vector2(522, 345), 8, INK, true)
 
+func _title_mouth() -> Vector2:
+	return Vector2(495, 151 + sin(clock * 2.5) * 4)
+
+func _update_title_snack(delta: float) -> void:
+	title_snack_wait -= delta
+	if title_snack_wait <= 0 and title_snack == null:
+		var kinds := ["regular", "big", "golden", "big_golden"]
+		var kind: String = kinds[title_snack_rng.randi_range(0, kinds.size() - 1)]
+		var angle := title_snack_rng.randf_range(0.0, TAU)
+		var origin := _title_mouth() + Vector2(cos(angle) * 57, sin(angle) * 45)
+		title_snack = Nugget.new(kind, 1, origin, Vector2.ZERO, 0,
+			title_snack_rng.randi_range(0, 1) if kind == "regular" else 0, 0, angle)
+		title_snack_wait = title_snack_rng.randf_range(5.0, 6.0)
+	elif title_snack != null:
+		title_snack.age += delta
+		if title_snack.age >= 1.0:
+			title_snack = null
+			expression = 0.42
+			_sound("catch", 0.95)
+
 func _title() -> void:
 	draw_rect(Rect2(0, 0, 640, 360), Color(0.21, 0.20, 0.24, 0.16))
 	_panel(Rect2(20, 20, 600, 320), Color("423747"))
-	_text("A VERY IMPORTANT FEEDING MISSION", Vector2(320, 38), 8, MINT, true)
+	_text("A VERY IMPORTANT FEEDING MISSION", Vector2(224, 38), 8, MINT, true)
+	_fullscreen_button()
 	_text("NUGGET", Vector2(224, 70), 40, GOLD, true)
 	_text("CAT", Vector2(224, 119), 40, CREAM, true)
 	_text("NO THOUGHTS. JUST CHICKEN.", Vector2(224, 173), 8, PINK, true)
@@ -879,12 +1067,33 @@ func _title() -> void:
 	var hovered := portrait.has_point(get_global_mouse_position())
 	draw_rect(portrait, Color("675367"))
 	draw_rect(Rect2(422, 81, 145, 132), MINT if hovered else Color("806678"), false, 2)
-	_cat_sprite(Vector2(495, 151 + sin(clock * 2.5) * 4), 6 if expression > 0 or fmod(clock, 5) > 4 else (1 if fmod(clock, 4) < 0.15 else 0), 2.8, sin(clock * 1.8) * 0.06)
+	var frame := 1 if fmod(clock, 4) < 0.15 else 0
+	if title_snack != null and title_snack.age > 0.55:
+		frame = 2
+	elif expression > 0:
+		frame = 2 if expression > 0.26 else 3
+	_cat_sprite(_title_mouth(), frame, 2.8, sin(clock * 1.8) * 0.06)
 	_text(CAT_NAMES[cat_name_index], Vector2(495, 223), 8, GOLD, true)
 	_text("CLICK TO MEET ANOTHER CAT", Vector2(495, 237), 8, MINT if hovered else CREAM, true)
-	draw_set_transform(Vector2(558, 88 + sin(clock * 3) * 4), clock * 0.7)
-	draw_texture_rect_region(nugget_tex, Rect2(-13, -13, 26, 26), _nugget_region("regular"))
-	draw_set_transform(Vector2.ZERO)
+	if title_snack != null:
+		# Give the little spawn burst a moment before the food flies inward.
+		var progress := smoothstep(0.18, 1.0, title_snack.age)
+		var position := title_snack.pos.lerp(_title_mouth(), progress) + Vector2(0, -sin(progress * PI) * 12)
+		var size := 26.0 * smoothstep(0.0, 0.12, title_snack.age) * (1.0 - smoothstep(0.8, 1.0, title_snack.age))
+		if title_snack.age < 0.4:
+			var burst := title_snack.age / 0.4
+			for i in range(8):
+				var direction := Vector2.RIGHT.rotated(title_snack.spin + i * TAU / 8)
+				var spark := (title_snack.pos + direction * (14 + burst * 12)).round()
+				var color: Color = [GOLD, PINK, MINT, CREAM][i % 4]
+				color.a = 1.0 - burst
+				draw_rect(Rect2(spark - Vector2.ONE, Vector2(2, 2)), color)
+				if burst < 0.6 and i % 2 == 0:
+					draw_line(spark - Vector2(3, 0), spark + Vector2(3, 0), color)
+					draw_line(spark - Vector2(0, 3), spark + Vector2(0, 3), color)
+		draw_set_transform(position, title_snack.age * 2)
+		draw_texture_rect_region(nugget_tex, Rect2(-size / 2, -size / 2, size, size), _nugget_region(title_snack.kind, title_snack.variant))
+		draw_set_transform(Vector2.ZERO)
 	_text("MOVE YOUR MOUSE. CATCH THE NUGGETS.", Vector2(224, 205), 8, CREAM, true)
 	_text("60 SECONDS. ONE VERY HUNGRY CAT.", Vector2(224, 221), 8, MINT, true)
 	_button("LET'S EAT!", "start", true)
@@ -895,7 +1104,49 @@ func _title() -> void:
 	_button("NUGGET GUIDE + ODDS", "guide")
 	_text("ENTER: START  /  ESC: QUIT  /  F11: FULLSCREEN", Vector2(320, 348), 8, INK, true)
 
+func _boss_stage() -> int:
+	return 3 if boss_hp > 27 else (2 if boss_hp > 13 else 1)
+
+func _boss_size() -> float:
+	return BOSS_SIZE + (4.0 if expression > 0.35 else 0.0)
+
+func _boss_contains_mouth(mouth: Vector2) -> bool:
+	# Test the visible sprite, with a small mouth-sized margin, not a hidden
+	# central target. The same rotation, scale and damage stage drive rendering.
+	var local := (mouth - boss_pos).rotated(-sin(boss_age * 1.2) * 0.12) * 32.0 / _boss_size() + Vector2(16, 16)
+	var radius := BOSS_MOUTH_RADIUS * 32.0 / _boss_size()
+	var mask := boss_masks[_boss_stage() - 1]
+	for y in range(maxi(0, floori(local.y - radius)), mini(32, ceili(local.y + radius))):
+		for x in range(maxi(0, floori(local.x - radius)), mini(32, ceili(local.x + radius))):
+			if mask.get_bit(x, y):
+				var nearest := local.clamp(Vector2(x, y), Vector2(x + 1, y + 1))
+				if local.distance_squared_to(nearest) <= radius * radius:
+					return true
+	return false
+
+func _draw_boss() -> void:
+	var stage := _boss_stage()
+	var texture := nugget_tex if stage == 3 else nugget_bite_tex
+	var size := _boss_size()
+	draw_set_transform(boss_pos, sin(boss_age * 1.2) * 0.12)
+	draw_texture_rect_region(texture, Rect2(-size / 2, -size / 2, size, size), _nugget_region("big", 0, stage))
+	draw_set_transform(Vector2.ZERO)
+	draw_rect(Rect2(200, 307, 240, 9), INK)
+	draw_rect(Rect2(202, 309, 236.0 * boss_hp / BOSS_BITES, 5), GOLD)
+	draw_rect(Rect2(135, 319, 370, 15), INK)
+	_text("BOSS: %d BITES LEFT / %d CHOMPS PER SEC" % [boss_hp, roundi(3 + boss_contact * 5 / 3)], Vector2(320, 322), 8, CREAM, true)
+
+func _belly_dance(origin: Vector2, time: float, scale_factor: float) -> void:
+	# Eight API-generated poses, palette-indexed offline; feet share a baseline.
+	var frame := floori(time * 10.0) % dance_art.frame_count
+	draw_set_transform(origin.round(), 0, Vector2.ONE * scale_factor)
+	draw_texture_rect_region(dance_tex, dance_art.draw_rect(), dance_art.frame_rect(frame))
+	draw_set_transform(Vector2.ZERO)
+
 func _victory_dance() -> void:
+	if boss_defeated:
+		_belly_dance(Vector2(200, 170), results_time + celebration_time, 1.0)
+		return
 	var beat := results_time * 2.4
 	var bounce := sin(fmod(beat, 1.0) * PI)
 	var stretch := 1.0 + 0.07 * bounce - 0.09 * pow(1.0 - bounce, 4)
@@ -919,8 +1170,8 @@ func _victory_dance() -> void:
 func _results() -> void:
 	draw_rect(Rect2(0, 0, 640, 360), Color(0.2, 0.17, 0.23, 0.3))
 	_panel(Rect2(113, 25, 414, 309))
-	_text("A CAT WELL FED.", Vector2(320, 43), 24, GOLD, true)
-	_text("NEW PERSONAL BEST!" if score > old_best else "A NOBLE DAY OF SNACKING.", Vector2(320, 77), 8, PINK, true)
+	_text("NEW BEST!" if score > old_best else "A CAT WELL FED.", Vector2(320, 43), 24, GOLD, true)
+	_text("BOSS DEVOURED! BELLY DANCE!" if boss_defeated else "BOSS ESCAPED! STILL WELL FED.", Vector2(320, 77), 8, PINK, true)
 	_victory_dance()
 	_text(CAT_NAMES[cat_name_index], Vector2(200, 177), 8, MINT, true)
 	_text("FINAL SCORE", Vector2(376, 102), 8, MINT, true)
@@ -948,14 +1199,16 @@ func _nugget_guide() -> void:
 	]
 	for i in range(rows.size()):
 		var row: Array = rows[i]
-		var y := 82 + i * 40
+		var y := 79 + i * 36
 		var size := 32 if NUGGET_TYPES[row[0]].hp == 3 else 26
 		draw_texture_rect_region(nugget_tex, Rect2(112 - size / 2.0, y + 13 - size / 2.0, size, size), _nugget_region(row[0]))
 		_text(row[1], Vector2(145, y), 8, PINK if row[0] == "burnt" else GOLD)
 		_text(row[2], Vector2(145, y + 14), 8, CREAM)
 		_text("%d%%" % NUGGET_TYPES[row[0]].chance, Vector2(505, y), 8, GOLD, true)
 		_text(row[3], Vector2(505, y + 14), 8, MINT, true)
-	_text("THROW ODDS AFTER 12S / TWO BIG GOLDENS: %.2f%%" % (BIG_GOLD_ROUND_CHANCE * SECOND_BIG_GOLD_CHANCE * 100), Vector2(320, 284), 8, MINT, true)
+	_text("THROW ODDS AFTER 12S / TWO BIG GOLDENS: %.2f%%" % (BIG_GOLD_ROUND_CHANCE * SECOND_BIG_GOLD_CHANCE * 100), Vector2(320, 263), 8, MINT, true)
+	_text("FINAL 15S: BOSS / HOLD TO SPEED UP / 40 BITES", Vector2(320, 279), 8, GOLD, true)
+	_text("FINISH: +500 AND A SPECIAL BELLY DANCE!", Vector2(320, 291), 8, CREAM, true)
 	_button("READY TO SNACK", "back", true)
 
 func _sources() -> void:

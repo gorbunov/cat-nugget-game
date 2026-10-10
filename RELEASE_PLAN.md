@@ -1,6 +1,8 @@
 # Cross-platform release plan
 
-**Status: deferred until the next round of gameplay polish is complete.**
+**Status: gameplay polish passed user playtesting on 2026-10-10. Ready for Step 1.**
+The accepted polish includes the 15-second bouncing boss finale, accelerated bites,
+AI-sprite belly-dance reward, and randomized title-screen feeding with spawn sparks.
 Resume with Step 1 below. This is a roadmap, not a claim that platform builds or
 publishing automation already exist.
 

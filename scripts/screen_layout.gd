@@ -6,6 +6,7 @@ enum Screen { TITLE, PLAYING, PAUSED, RESULTS, SETTINGS, GUIDE, SOURCES }
 const PAUSE_BUTTON := Rect2(588, 11, 34, 27)
 const BUTTONS := {
 	Screen.TITLE: {
+		"fullscreen": Rect2(568, 29, 26, 26),
 		"cat_shuffle": Rect2(415, 74, 159, 146),
 		"start": Rect2(100, 247, 245, 36),
 		"settings": Rect2(366, 252, 105, 26),

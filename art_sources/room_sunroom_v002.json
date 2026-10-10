@@ -1,0 +1,27 @@
+{
+  "request": {
+    "model": "gpt-image-2.5-flare",
+    "prompt": "Create ONE exceptionally well-crafted pixel-art room background for a finished cozy indie game. One complete room fills the entire opaque 1536x1024 canvas. NOT a collage, atlas, split screen or contact sheet. No characters, people, cats, flying food, UI, letters, numbers, logos or borders.\n\nThis is a higher-quality remake of a cozy pastel game room, preserving its layout and mood but replacing blurry, noisy, washed-out illustration with confident, deliberate PIXEL ART. Target the craftsmanship of premium modern pixel-art adventure games: clean contiguous pixel clusters, sharply defined stepped contours, readable silhouettes, carefully constructed material shading, subtle reflected light, controlled local contrast. Every object must be clear and attractive when downsampled to 640x360 and then integer-upscaled on a large monitor. A full 640x360 logical-pixel scene, NOT 320x180 and NOT a tiny retro thumbnail. Use fine purposeful details, not coarse blocky blobs. Render the pixel clusters SHARP, with no blur or soft brush texture. No film grain, speckles, random dithering, haze, chalkiness, watercolor, painterly strokes, JPEG artifacts or dirty patina. Large wall areas should be clean, quiet flat colors. Restrained high-quality pixel art, not a filtered photograph or a pixelated painting.\n\nUse harmonious muted pastel colors as specified below, but keep enough local tonal separation to clearly distinguish curtains, window frames, wood trim, furniture cushions and individual leaves. Rich material ramps, typically 4-6 clear shades per material. Do not reduce the entire scene to 8 or 24 similar colors. No dark black outlines; outline furniture with a related muted shade. Backgrounds should be quieter and lighter than the game's strongly outlined cat and orange nuggets. Preserve a broad uncluttered central play area. The visual interest is primarily on side walls, inside the window, and along the lower edge. No dramatic shafts of light or bright glowing bloom.\n\nStraight-on 2D camera, looking directly at the back wall, with a shallow floor strip along the bottom. No isometric perspective, no dollhouse view. Plan for a wide 16:9 final game frame: do not use tall narrow furniture, and leave the upper 15 percent of the picture quiet (a HUD will cover it). Whole room inside frame, objects arranged close to the supplied description. Aim for clean elegant architecture, detailed coherent decor, and warm lived-in charm. The final composition will be resized to 640x360: make small decor read at that size.\n\n\nROOM: SUNROOM. Airy botanical sitting room straight on, with a large central cream-framed multi-pane garden window, delicate pale cream curtains tied at sides, quiet layered sage-green garden outside with restrained tiny cream flowers. Two small wall shelves along each side hold different crisp leafy plants, a few neat books and blue-and-cream ceramic pots. A tall leafy potted plant in a woven basket at far lower left. Low honey-cream rattan loveseat at lower right with soft pale cushions, clearly constructed wicker weave using orderly pixel clusters rather than noise. Cream striped woven rug across the bottom-center floor. Pale olive wood trim and wainscoting. Keep the window view restrained and spacious, not a mass of noisy flowers. Clean morning light, no haze.\nPalette anchors: wall #dce0c7, detail #ccd2b9, wood #b7b89a, shadows #939b80, cream #f3e9cc, sky #c2dcd7, foliage #9fbea8, rattan and rug #d7c59f. Related shading colors should clearly separate each material while preserving the pale botanical palette.\n",
+    "n": 1,
+    "size": "1536x1024",
+    "quality": "high",
+    "background": "opaque",
+    "output_format": "png"
+  },
+  "request_id": "req_9957785f8bca4824a651a9532f13ae93",
+  "created": 1791628151,
+  "usage": {
+    "input_tokens": 757,
+    "input_tokens_details": {
+      "image_tokens": 0,
+      "text_tokens": 757
+    },
+    "output_tokens": 1372,
+    "output_tokens_details": {
+      "image_tokens": 1372,
+      "text_tokens": 0
+    },
+    "total_tokens": 2129
+  },
+  "revised_prompt": null
+}

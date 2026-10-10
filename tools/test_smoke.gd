@@ -93,7 +93,8 @@ static func _check_pacing(game: Game) -> bool:
 				previous_rate = game.audio.music.pitch_scale
 	assert(game.state == Game.Screen.RESULTS and game.remaining == 0)
 	assert(game.misses > 30 and game.catches == 0)
-	assert(throw_buckets[0] >= 24 and throw_buckets[1] > throw_buckets[0] and throw_buckets[2] > throw_buckets[1])
+	assert(throw_buckets[0] >= 24 and throw_buckets[1] > throw_buckets[0])
+	assert(throw_buckets[2] >= 1 and throw_buckets[2] < 6) # Throws stop at 41s, boss starts at 45s.
 	assert(is_equal_approx(game.audio.music.pitch_scale, 1.0))
 	print("PACE CHECK: throws per 20 seconds: %s; peak music speed: %.2fx; misses: %d" % [throw_buckets, previous_rate, game.misses])
 	return true
@@ -165,20 +166,21 @@ static func _check_round_choices(game: Game) -> bool:
 
 
 static func _check_palettes(game: Game) -> bool:
-	var role_examples := {}
-	for pixel in range(game.cat_art.indices.size()):
-		role_examples[game.cat_art.indices[pixel]] = Vector2i(pixel % game.cat_art.image_size.x, pixel / game.cat_art.image_size.x)
-	assert(role_examples.size() == game.cat_art.roles.size())
-	for palette_index in range(game.cat_palettes.size()):
-		var texture := game.cat_art.texture_for_palette(palette_index)
-		assert(texture == game.cat_art.texture_for_palette(palette_index))
-		var image := texture.get_image()
-		assert(image.get_size() == game.cat_art.image_size and image.get_pixelv(role_examples[0]).a == 0)
-		for role in range(1, game.cat_art.roles.size()):
-			var expected := Color(str(game.cat_palettes[palette_index].colors[game.cat_art.roles[role]]))
-			assert(image.get_pixelv(role_examples[role]).to_rgba32() == expected.to_rgba32())
-		for frame in range(game.cat_art.frame_count):
-			assert(image.get_region(Rect2i(game.cat_art.frame_rect(frame))).get_used_rect().has_area())
+	for art in [game.cat_art, game.dance_art]:
+		var role_examples := {}
+		for pixel in range(art.indices.size()):
+			role_examples[art.indices[pixel]] = Vector2i(pixel % art.image_size.x, pixel / art.image_size.x)
+		assert(role_examples.size() == art.roles.size())
+		for palette_index in range(game.cat_palettes.size()):
+			var texture: Texture2D = art.texture_for_palette(palette_index)
+			assert(texture == art.texture_for_palette(palette_index))
+			var image := texture.get_image()
+			assert(image.get_size() == art.image_size and image.get_pixelv(role_examples[0]).a == 0)
+			for role in range(1, art.roles.size()):
+				var expected := Color(str(game.cat_palettes[palette_index].colors[art.roles[role]]))
+				assert(image.get_pixelv(role_examples[role]).to_rgba32() == expected.to_rgba32())
+			for frame in range(art.frame_count):
+				assert(image.get_region(Rect2i(art.frame_rect(frame))).get_used_rect().has_area())
 	return true
 
 

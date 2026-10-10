@@ -1,0 +1,27 @@
+{
+  "request": {
+    "model": "gpt-image-2.5-flare",
+    "prompt": "Create a production-quality eight-frame looping BELLY DANCE animation sprite sheet for Nugget Cat, a cute pixel-art arcade game. A very happy chubby kitten has eaten a giant chicken nugget and celebrates like the playful upright dancing kittens in viral AI kitten videos. Clearly animate its big pudgy belly, hips, little raised paws and happy face. Wholesome, silly and charming. No costume or accessories.\n\nTRANSPARENT PNG, 1536x1024 canvas. EXACTLY EIGHT full-body sprites in a regular 4 COLUMN x 2 ROW grid, each invisible cell 384x512. Reading order left to right, top row then bottom row. One complete kitten per cell, centered, with feet at y=460 within each cell. Same camera, scale, character, head size and body proportions in all eight frames. Every kitten including raised paws, ears and tail fits within its own cell with at least 24 pixels of transparent margin. No grid lines, text, labels, food, floor, background, cast shadows or extra characters.\n\nThe SAME front-facing adorable kitten throughout: huge rounded head with little triangular ears, big sparkling turquoise eyes, simple dark forehead tabby stripes, short whiskers, small pink nose, cream muzzle, cheerful little smile, plump pear-shaped torso, LARGE ROUND CREAM BELLY, two short hind legs standing upright, two small front paws lifted beside its head, fluffy tail curling to the side. Its head is about 45 percent of full standing height, with enough torso to make the belly dance obvious. Keep it recognizably a kitten, not a human dancer. All poses are mostly front facing.\n\nEight distinct sequential poses of ONE continuous dance cycle, no duplicates: 0 centered with arms up, knees slightly bent; 1 hips travel left and shoulders counter-sway right; 2 maximum left hip sway, right heel raised, left paw dips; 3 return toward center with belly rolling upward and a delighted blink; 4 centered with belly pushed forward, both paws up; 5 hips travel right and shoulders counter-sway left; 6 maximum right hip sway, left heel raised, right paw dips; 7 return toward center with a little shoulder shimmy and belly settling, leading smoothly back to frame 0. Use real changes to limb and belly shapes, not rotated copies of one pose. Keep the face adorable, happy and consistent.\n\nGenuine crisp pixel-art style: design as approximately 96x96 game sprites enlarged with nearest-neighbor pixels. Intentional stepped silhouettes and coherent pixel clusters, dark plum outlines, flat cel shading, no gradients, blur, glossy 3D, painterly texture or semi-transparent fringes. Three fur shades, two belly shades, two iris shades.\n\nEXACT SEMANTIC COLOR ROLES for automatic palette conversion: COOL SLATE-GRAY coat, never brown: shadow #596375, midtone #909CAC, highlight #BCC5D1. WARM CREAM #F3DCAB and shadow #D5B885 only on belly and muzzle. Dark plum-black #302736 outlines, pupils, mouth cavity and tabby stripes. TURQUOISE irises #55CDBA with pale mint #A5EEE0; dark pupils and white shine dots. Rose PINK #E889A6 and shadow #BD647E nose, blush, inner ears and tongue. WHITE #FFFFFF eye glints. These distinct colors will be swapped into seven cat palettes, so do not mix cream into gray fur or use gray for the belly.\n",
+    "n": 1,
+    "size": "1536x1024",
+    "quality": "high",
+    "background": "transparent",
+    "output_format": "png"
+  },
+  "request_id": "req_85147e9e6ecf40d6b59106b3247ddcd6",
+  "created": 1791630477,
+  "usage": {
+    "input_tokens": 727,
+    "input_tokens_details": {
+      "image_tokens": 0,
+      "text_tokens": 727
+    },
+    "output_tokens": 1372,
+    "output_tokens_details": {
+      "image_tokens": 1372,
+      "text_tokens": 0
+    },
+    "total_tokens": 2099
+  },
+  "revised_prompt": null
+}
