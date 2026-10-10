@@ -1,630 +1,229 @@
 # Nugget Cat · 0.11.5
 
-A tiny, original pixel-art arcade game for Godot 4.7.2, with macOS, Windows and Web exports.
+A small pixel-art arcade game built with Godot 4.7.2 for macOS, Windows and Web.
 An orange cat. Sixty seconds. An unreasonable amount of chicken.
 
-## Why we made this
+## Project
 
-This game was made together with my kid as a hands-on way to learn how to plan
-a hobby project, iterate on ideas, and follow through to a finished, playable
-result. The process of making something together is as important as the game.
+Made together by a parent and child to learn how to plan a hobby project, iterate
+on ideas, and follow through to a playable result. Making it together is as
+important as the game itself.
 
-**AI disclosure:** This game uses AI-generated images and music. The character,
-hand, nugget and room artwork was generated with AI and processed into game-ready
-sprites; the music was made through AI-assisted composition and synthesis scripts.
-The crowd reactions and gulp are separately sourced CC0 recordings, credited in
-the sound references below and in the in-game Sources panel.
+**AI disclosure:** The game uses AI-generated images and music. Character, hand,
+nugget and room artwork is processed into game-ready sprites; music uses
+AI-assisted composition and synthesis scripts. Crowd reactions and gulp sounds
+are separate CC0 recordings, credited below and in the in-game Sources panel.
+Preserve this story, disclosure and credits when publishing the game.
 
-This project background and AI disclosure should accompany the game if we
-publish or share it publicly.
+- [Deployment](DEPLOYMENT.md): build, signing, notarization, itch.io uploads and current release status.
+- [Planned work](RELEASE_PLAN.md): outstanding validation and future milestones only.
+- [Repository guidance](AGENTS.md): implementation conventions and verification rules.
+
+### Current state
+
+- Gameplay polish passed owner playtesting on 2026-10-10.
+- macOS, Windows and single-threaded Web exports have passed automated checks.
+- Safari and Chrome passed owner browser playtesting; this does not establish
+  itch.io embedded-play or Windows-device validation.
+- Version 0.11.5 is uploaded and processed on all three itch.io channels.
+- Developer ID signing and notarization automation are implemented. Apple's
+  first submission is still processing; see [deployment status](DEPLOYMENT.md#current-release-status).
 
 ## Play
 
-Open **`build/macos/Nugget Cat.app`**, or import `project.godot` in Godot and press **F6/F5**.
-Windows builds are in `build/windows/`. For a browser preview, run
-`python3 tools/serve_web.py` and open **http://127.0.0.1:8060/**.
-
-- **Mouse:** move the cat's mouth; catches happen automatically.
-- **Enter / Space:** start a round or replay from results.
-- **Escape:** quit from the desktop title screen, pause/resume during a round, or close a settings/guide/sources panel. Browser/tablet builds omit Quit; Escape on their title screen does nothing. The game also pauses when it loses focus.
-- **F11 / Option+Return:** toggle fullscreen. On keyboards with media keys, use **Fn+F11**.
-- **Start-screen square expand/contract icon:** switch fullscreen mode with one click.
-- **Settings:** fullscreen toggle, music selection, and Master/Music/Sounds volume sliders.
-
-Click or drag a volume slider, or use its −/+ buttons. Master controls all audio
-and saves with the other preferences; zero mutes the game. Older saves default
-Master to 100%. Music now reaches full gain at 100%, with effects and crowd
-reactions balanced below it.
-
-Fullscreen switching during a round pauses the game so window changes never cost a
-catch. Press Escape or Keep Munching to continue. Windowed size and position are
-restored when leaving fullscreen. Fullscreen and soundtrack preferences are saved.
-Browser fullscreen uses the on-screen control or **Alt+Enter**, and is shown only
-when supported by the browser/embedding page. Browser F11 remains browser-owned.
-Saved fullscreen is not restored automatically in a browser: it requires a user
-gesture. Music starts after the first click, keypress or touch on the game.
-
-### Soundtrack
-
-By default, a random track is selected at launch and at the start of each round,
-with no back-to-back repeats. **Settings → Music: Random Each Round** toggles
-randomization. The arrow buttons preview a track and switch to **Keep This Track**
-mode. This preference is saved, including when upgrading an older save.
-
-| Track | Character | Tempo |
-|---|---|---|
-| Snack Time | Original bouncy chip melody | 128 BPM |
-| Sunny Side Up | Sunny bell lead, light arpeggios, breezy rhythm | 112 BPM |
-| Goofy Whiskers | Staccato jumps, swung offbeats, bouncing bass | 144 BPM |
-| Nugget Quest | Adventurous pulse lead, rising melodies, layered harmony | 132 BPM |
-| Nugget Battle | Minor-key battle melody, driving eighth-note bass, stronger drums | 152 BPM |
-
-The v0.6 arrangements use lower-register leads, rounded synth waveforms, softer
-attacks/releases, and gentle treble filtering. Finale arpeggios are lower and
-quieter too. The battle track gets its intensity from rhythm and harmony while
-using the same softened chip instruments. It is included in random selection.
-
-Each new track has a 32-bar arrangement with phrase variations and its own
-tempo/harmony-matched finale layer. Tracks loop; each round's track starts fresh
-with each round. The music selector previews audio even from the paused game.
-The new tracks also have editable **`.mid` files in `assets/`**. The game plays
-rendered WAVs so no MIDI synth or soundfont installation is needed.
-
-### Random cat colors
-
-Every round gets a random **Ginger, Snow, Silver, Cocoa, Lavender, Mint, or Charcoal** cat,
-without repeating the preceding color. Its color stays the same during gameplay,
-pause, and results. The palette swap changes fur, highlights, and belly while
-preserving mouth, blush, outlines, and transparency across all animations.
-Eyes are coordinated with the fur: **Ginger → green, Snow → blue, Silver → teal,
-Cocoa → amber, Lavender → honey-gold, Mint → blue, Charcoal → emerald**. Colored
-irises retain dark pupils and bright highlights; blinking and sleeping eyes stay
-closed. Charcoal uses soft gray highlights for a readable black-ish coat.
-Each cat also gets one of 20 cute names, such as Mochi, Biscuit, Waffles, Dumpling,
-Pudding, or Boba. The name appears on the title, gameplay, and results screens;
-the color is also shown along the bottom of the play area.
-Click the cat portrait on the title screen to meet another randomly named and
-colored cat, with no immediate repeats of either. That name/color pair is used
-for the next round; subsequent replays resume automatic randomization.
-
-### AI cat art and editable palettes
-
-The cat now uses an AI-generated eight-frame animation sheet, cleaned up into
-64×64 pixel-art frames. A single **palette-indexed** atlas contains the shape and
-animation information for every color variant. Its red channel stores role IDs,
-not visible colors, so `assets/cat_indexed.png` looks nearly black on its own.
-
-- **`assets/cat_palettes.json`** — editable colors and named palettes.
-- **`assets/cat_sprite.json`** — role names, frame layout, display size and mouth anchor.
-- **`scripts/cat_appearance.gd`** — validated palette loading and lazy texture cache.
-- **`art_sources/cat_v001.png`** — original API-generated source image.
-- **`art_sources/cat_v001_palette_preview.png`** — all palettes and expressions.
-
-Each palette can override fur/shadow/highlight, belly, iris/highlight, pink
-accents, outline and white highlights. Omitted colors inherit `defaults`.
-To add another color, append an entry to the `palettes` array, for example:
-
-```json
-{
-  "name": "PEACH",
-  "colors": {
-    "fur_shadow": "b87569",
-    "fur": "e9a18a",
-    "fur_light": "ffd0ab",
-    "belly_shadow": "d9b79a",
-    "belly": "ffe8ca",
-    "iris": "77a685",
-    "iris_light": "c1e6b5"
-  }
-}
-```
-
-Restart the game to load palette edits; rebuild the app to ship them. No API call,
-new artwork, or gameplay-code change is needed. Random selection automatically
-includes added palettes. Role IDs/order in `cat_sprite.json` describe the atlas
-format: keep them stable unless rebuilding the indexed sheet. Keep that texture's
-import lossless, without mipmaps or alpha-border fixing.
-
-Recoloring uses byte-indexed lookup tables, not source-RGB comparisons or manually
-painted eye coordinates. A texture is created on first use of a palette, then
-cached and reused; there is no recoloring work during animation playback.
-
-Regular catches earn 10 points times your multiplier. Every five consecutive catches
-raises the multiplier for subsequent catches, up to ×5. A miss resets the combo
-without subtracting points. The last **15 seconds** are a **BOSS NUGGET** encounter.
-New throws stop at 41 seconds, letting existing food be eaten or fly away naturally.
-A **BOSS IN 3... 2... 1...** warning and rising sound cues announce the transition
-at 45 seconds; the finale music layer joins when the boss arrives. Any lingering
-food clears without an extra miss penalty. The larger 96-pixel boss moves faster
-and bounces off the playfield edges. Put the mouth anywhere on its visible food
-to take 40 automatic bites—there is no center target. Bite holes are not food.
-Biting ramps from 3 to 8 chomps per second over three seconds of contact. Brief
-slips preserve speed for 0.25 seconds; longer gaps gradually cool it down. Damage
-persists, but bites never accumulate while away. Perfect tracking takes about six
-seconds. Finishing awards a fixed 500-point bonus and freezes the countdown for
-a three-second, palette-matched upright belly dance, which loops on results.
-If time runs out, the boss escapes and you keep your earlier score.
-The exclusive boss-win dance uses an eight-pose OpenAI-generated sprite sheet,
-converted offline to a 96×96 palette-indexed atlas. It includes raised paws,
-hip sways, a belly-forward pose and a happy blink in all seven cat palettes.
-The retained source and request metadata are `art_sources/cat_dance_v001.png`
-and `.json`; `assets/cat_dance_sprite.json` defines the frame geometry and roles.
-Rebuild it offline with:
+Open `project.godot` in Godot and press **F6/F5**, or build a native release:
 
 ```sh
-/Applications/Godot.app/Contents/MacOS/Godot --headless --path . --script tools/prepare_cat_dance.gd
-/Applications/Godot.app/Contents/MacOS/Godot --headless --path . --editor --import --quit
-/Applications/Godot.app/Contents/MacOS/Godot --path . --script tools/preview.gd -- --boss
-```
-
-Keep `assets/cat_dance_indexed.png` lossless with mipmaps and alpha-border fixing
-disabled, just like the gameplay cat atlas. To request a new candidate, use
-`python3 tools/generate_ai_art.py --asset cat_dance --quality high --name cat_dance_v002`
-(one billed request); selecting a new source requires updating the converter.
-At the end of each round, your cat celebrates with a looping victory dance:
-hops, squishy landings, side-to-side wiggles, turns, silly expressions and sparkles.
-The same cat, name, fur and eye palette carry through to the results screen.
-
-### Nugget types and spawn odds
-
-Open **Nugget Guide + Odds** on the title screen, or **Nugget Guide** while paused.
-
-| Type | Base score | Effect | Chance |
-|---|---:|---|---:|
-| Regular | 10 | One automatic chomp; two crispy silhouettes | 70% per ordinary throw |
-| Big regular | 30 | Three automatic chomps | 15% per ordinary throw |
-| Burnt | — | Avoid; eating one costs up to 30 points and resets combo/golden bonus | 11% per ordinary throw |
-| Golden | 20 | Adds one multiplier tier, capped at ×5 | 4% per ordinary throw |
-| Big golden | 100 | Three chomps, then collects all edible flying nuggets | 18% chance per round |
-
-All edible base scores use the current multiplier. Stay on a big nugget to chomp
-three times, 0.2 seconds apart; bite progress is retained if you move away. Each
-bite slows it down and its three pips show progress. Missing edible food resets
-the combo and golden bonus. Letting burnt food fly away has no penalty. Burnt
-nuggets remain on screen during a golden collection wave; the wave never eats them.
-
-Burnt catches play the first two seconds of IENBA's **Small crowd reactions**;
-either golden type plays zut50's **Yay!**; finishing a big regular plays
-gary_in_wv's **Cartoony Gulp**. Reactions follow effects volume; collection waves
-keep a single cheer. All three recordings are CC0; source links and license
-details are retained in `art_sources/reactions.json` alongside their high-quality
-Freesound MP3 previews. Prepare the bundled WAVs offline with
-`python3 tools/generate_reactions.py` (requires macOS `afconvert`). Conversion
-preserves natural pitch and timing, applies peak normalization and tiny edge fades.
-
-#### Sound credits and references
-
-The title screen's **Sources** panel credits the creators and links to each sound
-and its license. These recordings are released under
-[CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/), permitting commercial
-use and modification without required attribution.
-
-| Use | Recording | Creator | Edit |
-|---|---|---|---|
-| Burnt nugget | [Small crowd reactions](https://freesound.org/people/IENBA/sounds/488472/) | IENBA | First 2 seconds |
-| Golden / big golden | [yay.mp3](https://freesound.org/people/zut50/sounds/162395/) | zut50 | Full clip |
-| Big regular | [gulpCartoony.mp3](https://freesound.org/people/gary_in_wv/sounds/449868/) | gary_in_wv | Full clip |
-
-All three are converted to mono WAV with normalized peaks and tiny edge fades;
-pitch is unchanged. `art_sources/reactions.json` retains the source-page URLs,
-download URLs, license references and clip boundaries for future documentation.
-Preview the in-game credits with
-`/Applications/Godot.app/Contents/MacOS/Godot --path . --script tools/preview.gd -- --sources`.
-
-Big regulars unlock after 4 seconds, burnt after 8, and golden after 12. Until a
-type unlocks, its share becomes regular nuggets. The percentages in the table
-apply after the warm-up; rare big-golden spawns replace an ordinary throw.
-An eligible round gets one big golden between 18–34 seconds. Only 0.5% of those
-rounds get a second at 36–38 seconds: **0.09% of all rounds**, about 1 in 1,100.
-There are never more than two. Golden bonuses do not inflate the actual catch streak.
-
-The six-frame `assets/nuggets.png` atlas includes two regular shapes and the four
-special appearances. The active sprites were generated through the image API,
-then cropped, scaled and palette-reduced into crisp 32px frames. The original
-sheet and enlarged game-ready preview are retained at
-`art_sources/nuggets_v001.png` and `art_sources/nuggets_v001_pixel_preview.png`.
-The local generation tool remains available as an offline fallback.
-
-Big regular and big golden nuggets now show actual missing bites and pale exposed
-centers after each chomp. The separate `assets/nugget_bites.png` atlas is derived
-offline from the active sprites by `tools/prepare_nugget_bites.gd`; regenerate it
-after replacing `assets/nuggets.png`. The bite shape rotates with the nugget and
-persists if the cat moves away before finishing it.
-
-### Randomized pixel-art rooms
-
-Sage Kitchen, Strawberry Cafe, Sunroom and Moonlit Study each use an individual
-1536×1024 OpenAI image generated at high quality. The selected sources are
-`art_sources/room_{kitchen,cafe,sunroom,study}_v002.png`, with prompts and non-secret
-request metadata retained alongside them. `tools/prepare_rooms.gd` converts these
-directly to native 640×360 room frames in `assets/rooms.png`, preserving the source
-material colors and fine detail. Runtime integer scaling uses nearest filtering.
-The muted sage, pink, botanical and lavender themes keep scenery quieter than the
-cat and food. The original four-room candidate remains in `art_sources/rooms_v001.png`.
-
-Each round chooses a different room without immediate repeats, with randomized
-left/right furniture orientation. It stays fixed through pause and results;
-scenery randomness is independent of gameplay randomness.
-
-```sh
-# Offline conversions (no API request).
-/Applications/Godot.app/Contents/MacOS/Godot --headless --path . --script tools/prepare_rooms.gd
-/Applications/Godot.app/Contents/MacOS/Godot --headless --path . --script tools/prepare_nugget_bites.gd
-/Applications/Godot.app/Contents/MacOS/Godot --headless --path . --editor --import --quit
-# Actual game screenshots, including all bite stages against every room.
-/Applications/Godot.app/Contents/MacOS/Godot --path . --script tools/preview.gd -- --rooms --bites
-# Verify the start-screen toggle and capture rooms at actual fullscreen size.
-/Applications/Godot.app/Contents/MacOS/Godot --path . --script tools/preview.gd -- --rooms --check-title-fullscreen
-```
-
-To generate another room candidate, use
-`python3 tools/generate_ai_art.py --asset rooms --room kitchen --quality high --name room_kitchen_v003`
-(one billed request, no automatic retries). Room choices are `kitchen`, `cafe`,
-`sunroom` and `study`. Inspect it, then update `SOURCES` in
-`tools/prepare_rooms.gd` to activate it via the offline conversion.
-
-### Difficulty and musical pace
-
-The first hand appears after 0.25 seconds and releases its nugget roughly one
-second into the round. Throw frequency, flight speed, and music speed follow a
-shared smooth curve:
-
-| Time into round | Average throw interval | Flight time to target | Music speed |
-|---|---|---|---|
-| 0 seconds | 0.82 s | 1.05 s | 1.00× |
-| 15 seconds | 0.64 s | 0.95 s | 1.04× |
-| 35 seconds | 0.48 s | 0.82 s | 1.09× |
-| 50 seconds | 0.36 s | 0.75 s | 1.14× |
-| 60 seconds | 0.30 s | 0.68 s | 1.20× |
-
-Throws have ±8% timing variation, with the same readable wind-up throughout.
-New throws stop at 41 seconds; the boss arrives at 45 seconds.
-Throw intervals and flight times apply only to ordinary food;
-the music continues its speed ramp during the boss encounter.
-Music speed and pitch rise together for an arcade-style build-up; the main tune
-and finale layer use the same rate. Settings previews, results, and title music
-return to normal speed. Resuming restores the current round's musical pace.
-
-The game opens at 1280×720 with a 640×360 logical canvas and integer scaling.
-Best score and volume settings are saved through Godot's standard `user://`
-location (`~/Library/Application Support/Godot/app_userdata/Nugget Cat/`).
-
-## Project layout
-
-| Path | Purpose |
-|---|---|
-| `scripts/game.gd` | Round lifecycle, simulation, input, custom drawing and persistence |
-| `scripts/game_audio.gd` | Scene-owned music, synchronized finale, effects pool and reaction voice |
-| `scripts/screen_layout.gd` | Screen enum and shared geometry for drawing and button hit testing |
-| `scripts/nugget.gd` | Typed mutable nugget flight and bite state |
-| `scripts/difficulty.gd` | Smooth pacing curve with named throw interval, flight time and music rate |
-| `scripts/cat_appearance.gd` | Indexed palette validation and cached cat textures |
-| `main.tscn` | Main Node2D with an Audio child node |
-| `assets/` | Original PNG sprite sheets, bitmap font, synthesized WAV audio |
-| `tools/generate_assets.py` | Reproducible art/audio generator, Python standard library only |
-| `tools/compose_music.py` | Four additional compositions, MIDI sources and matching finale layers |
-| `tools/check_audio.py` | Checks music format, headroom, loop boundaries and matching stem durations |
-| `tools/generate_ai_hands.py` | One OpenAI Image API request; reads `OPENAI_API_KEY` from the environment |
-| `tools/generate_ai_art.py` | Shared API generator for hand, cat, nugget and room sheets; one candidate per request |
-| `tools/prompts/hands.txt` | Art direction and pose/layout prompt |
-| `tools/prompts/cat.txt` | Eight cat expressions and source color-role instructions |
-| `tools/prepare_hands.gd` | Offline cleanup, 14-color palette reduction and wrist alignment |
-| `tools/prepare_cat.gd` | Offline cat alignment, semantic index map, palette preview and app icon |
-| `tools/generate_nugget_sprites.gd` | Local six-frame nugget art for offline playtests |
-| `tools/prepare_nuggets.gd` | Convert the API nugget sheet into the same game atlas |
-| `tools/prepare_nugget_bites.gd` | Derive transparent bite stages from the active big nugget sprites |
-| `tools/prepare_rooms.gd` | Convert the API room sheet to pixel-grid backgrounds with muted palettes |
-| `tools/test_nuggets.gd` | Multi-chomp, hazard, buff, sweep and probability integration checks |
-| `tools/test_smoke.gd` | Round, music, palette, persistence and navigation checks; invoked with `--smoke-test` |
-| `art_sources/` | Generated source, request metadata and enlarged sprite preview; ignored by Godot |
-| `release.json` | Canonical game version and pinned Godot version |
-| `tools/build_release.py` | Sync versions, import, test, export and package platform builds |
-| `tools/serve_web.py` | Serve the Web build locally for browser playtesting |
-| `scripts/platform_policy.gd` | Platform capabilities for Quit and fullscreen controls |
-| `tools/fetch_template.py` | Optional local macOS-template fallback using HTTP byte ranges |
-| `tools/preview.gd` | Render actual game screens; `--rooms --bites` covers scenery and bite stages |
-| `export_presets.cfg` | macOS, Windows x86_64 and single-threaded Web export presets |
-| `build/` | App, zip, export template, and preview screenshots; ignored by Godot |
-
-### Code organization
-
-The game keeps its 640×360 custom renderer and a small scene tree. `game.gd`
-coordinates a round; `_step(delta)` lists the simulation phases in execution
-order. Golden collection runs after nugget collisions, so removing collected
-food cannot invalidate that iteration. Each flying nugget is a shared, typed
-`RefCounted` record used by simulation, drawing and the preview tools.
-
-`game_audio.gd` owns playback nodes and volume application. The game decides when
-to select a track, pause, or start the finale; the audio component handles how.
-It is an ordinary child of the main scene, with no global singleton state.
-
-Screen changes use `ScreenLayout.Screen` and the transition helpers in
-`game.gd`. Button rectangles live in `screen_layout.gd`; drawing and hit testing
-use that same geometry. Only the active screen accepts clicks, even before its
-first draw. Keyboard shortcuts are the `confirm`, `back`, and
-`toggle_fullscreen` actions in Project Settings → Input Map.
-
-When extending the game:
-- Add nugget rules in `NUGGET_TYPES` and the consumption/spawn helpers, and cover
-  new mechanics in `tools/test_nuggets.gd`.
-- Add a screen's button geometry in `screen_layout.gd`, its presentation and
-  actions in `game.gd`, and navigation checks in `tools/test_smoke.gd`.
-- Keep rendering free of simulation changes and random-number consumption.
-- Set `test_mode` before adding test scenes to the tree. It suppresses live
-  processing, audio playback and normal save access; persistence tests use a
-  disposable file under `build/`.
-
-## Development commands
-
-### Persistent image API credentials on macOS
-
-Store the key once in macOS Keychain. Run this helper in your terminal:
-
-```sh
-python3 tools/setup_api_key.py
-```
-
-Paste your complete OpenAI API key at the hidden prompt. The helper writes through
-the native Keychain API and verifies an exact read-back, avoiding possible length
-limits in the `security` CLI's interactive password prompt. The key never appears
-in command arguments or shell history. Image-generation tools first
-check `OPENAI_API_KEY`, then this Keychain entry. The key stays outside the project
-and persists across terminal/OpenCode restarts. To confirm availability without
-displaying the key or making a billed request:
-
-```sh
-python3 tools/generate_ai_art.py --check-key
-```
-
-### Build and asset commands
-
-Run from this project folder:
-
-```sh
-# Recreate the procedural assets and music.
-python3 tools/generate_assets.py
-
-# Recreate the game hand sheet from the retained AI source (offline, no API call).
-/Applications/Godot.app/Contents/MacOS/Godot --headless --path . --script tools/prepare_hands.gd
-
-# Recreate the indexed cat atlas, preview and icon from the retained AI source.
-/Applications/Godot.app/Contents/MacOS/Godot --headless --path . --script tools/prepare_cat.gd
-
-# Check generated music files.
-python3 tools/check_audio.py
-
-# Import resources.
-/Applications/Godot.app/Contents/MacOS/Godot --headless --path . --editor --import --quit
-
-# Run deterministic behavior checks without changing saved scores/settings.
-/Applications/Godot.app/Contents/MacOS/Godot --headless --path . -- --smoke-test
-
-# Verify special nugget mechanics and spawn distributions.
-/Applications/Godot.app/Contents/MacOS/Godot --headless --path . --script tools/test_nuggets.gd
-
-# Render screenshots (requires graphical session).
-mkdir -p build/previews
-/Applications/Godot.app/Contents/MacOS/Godot --path . --script tools/preview.gd
-
-# Also verify actual fullscreen transitions and music previews.
-/Applications/Godot.app/Contents/MacOS/Godot --path . --script tools/preview.gd -- --check-settings
-
-# Import, run tests/audio checks, and export all three platforms.
-python3 tools/build_release.py
+python3 tools/build_release.py --targets macos
 open "build/macos/Nugget Cat.app"
+```
 
-# Or build one target, with the same checks.
+For browser playtesting:
+
+```sh
 python3 tools/build_release.py --targets web
 python3 tools/serve_web.py
 ```
 
-Install matching **4.7.2** export templates using Godot's Export Template Manager.
-The Web preset needs `web_nothreads_debug.zip` and `web_nothreads_release.zip`;
-it does not require SharedArrayBuffer or cross-origin isolation headers. Serve
-the output over HTTP(S), rather than opening `index.html` as a local file.
+Open http://127.0.0.1:8060/. The itch.io project is
+https://gorbunov.itch.io/nugget-cat; access depends on its dashboard visibility.
 
-`release.json` is the source of truth for versioning. After editing it, run
-`python3 tools/build_release.py --sync-only` to update the README heading,
-Godot application version, and macOS/Windows package versions. The normal build
-command also synchronizes them and checks the installed Godot version.
-`--check-version` verifies alignment without changing files. `--godot` (or the
-`GODOT` environment variable) can select the matching executable.
-
-| Target | Build output |
+| Control | Action |
 |---|---|
-| macOS | `build/macos/Nugget Cat.zip` and extracted `Nugget Cat.app` |
-| Windows | `build/windows/Nugget Cat.exe` and `Nugget Cat-windows.zip` |
-| Web | `build/web/index.html` and supporting files; upload the whole folder |
+| Mouse | Move the cat's mouth; catches and bites happen automatically |
+| Enter / Space | Start or replay |
+| Escape | Pause/resume, close a panel; quit from the desktop title screen |
+| F11 / Option+Return | Desktop fullscreen (Fn+F11 on some keyboards) |
+| On-screen fullscreen control / Alt+Enter | Browser fullscreen, where supported |
+| Settings | Master, Music and Sounds volumes; soundtrack selection and fullscreen |
 
-Build/import/test logs are retained in `build/logs/`. All three targets export;
-Safari and Chrome passed user playtesting. Windows-device testing and itch.io
-embedded/fullscreen checks remain release milestones in `RELEASE_PLAN.md`;
-Firefox is deferred. Browser storage is local to that browser/origin
-and may be cleared by the player or browser. Native tablet controls are still a
-later milestone.
+The game pauses on focus loss or a fullscreen change during a round. Browser
+audio waits for user interaction; fullscreen requires a gesture and is never
+auto-restored. Browser F11 belongs to the browser. Browser/tablet title screens
+omit Quit. Native scores/preferences use Godot's `user://` directory; browser
+storage is local to the browser/origin and can be cleared by the player or browser.
 
-The branded Web loading page is `web/shell.html`; it keeps real download progress
-and startup-error reporting while using the cat artwork and game colors. Both
-Web and native startup use `assets/boot_splash.png`, prepared offline from the
-happy ginger cat with `tools/prepare_boot_splash.gd`. The Sources screen includes
-the **Made with Godot** credit.
+### Game rules
 
-Default local macOS builds are ad-hoc-signed playtests. Add `--notarize` for a
-Developer ID signed and notarized distribution build (see below). The source
-project is also playable directly in Godot.
+Catch nuggets to build a combo. Every five consecutive catches raises the
+multiplier for subsequent catches, up to ×5. Missing edible food resets the
+combo and golden bonus; letting burnt food fly away has no penalty.
 
-### macOS signing and notarization
+| Nugget | Base score | Behavior | Spawn chance |
+|---|---:|---|---|
+| Regular | 10 | One chomp | 70% per ordinary throw |
+| Big regular | 30 | Three chomps | 15% per ordinary throw |
+| Burnt | — | Costs up to 30 points and resets combo/golden bonus | 11% per ordinary throw |
+| Golden | 20 | Adds a multiplier tier, capped at ×5 | 4% per ordinary throw |
+| Big golden | 100 | Three chomps, then collects all edible flying nuggets | 18% chance per round |
 
-`release.json` contains the public signing identity and Keychain profile name.
-The certificate/private key and notarization credentials live in macOS Keychain.
-This Mac uses **Developer ID Application: Oleg Gorbunov (B5U2KSR3KF)** and
-**NuggetCat-notary**. `MACOS_SIGNING_IDENTITY` and `NOTARY_KEYCHAIN_PROFILE` can
-override those names on another Mac. Set up credentials interactively with:
+Edible scores use the current multiplier. Big nuggets retain bite progress when
+the cat moves away. Golden collection never eats burnt nuggets. Big regular,
+burnt and golden throws unlock at 4, 8 and 12 seconds; locked types become regular
+nuggets. Big golden spawns occur at 18–34 seconds; a second has a 0.09% overall
+chance per round. The in-game Nugget Guide shows the rules and odds.
 
-```sh
-xcrun notarytool store-credentials "NuggetCat-notary"
-```
+Ordinary throws stop at 41 seconds. The final 15 seconds feature a bouncing boss
+nugget: track visible food to take 40 bites. Biting accelerates from 3 to 8 chomps
+per second over three seconds of contact; brief slips preserve speed, longer gaps
+cool it down. Finishing awards 500 points and a three-second belly dance; otherwise
+the boss escapes and the earlier score remains.
 
-Build a public-distribution Mac archive without uploading to itch.io:
+Each round chooses a cat name, one of seven palettes, and one of four rooms, with
+no immediate color/room repeats. Clicking the title-screen portrait changes the
+cat for the next round. Five soundtracks are available: Snack Time, Sunny Side Up,
+Goofy Whiskers, Nugget Quest and Nugget Battle. Random selection avoids immediate
+repeats; players can keep a chosen track. Music pace rises through the round and
+the finale adds a synchronized layer.
 
-```sh
-python3 tools/build_release.py --targets macos --notarize
-```
+## Development
 
-`tools/notarize_macos.py` re-signs the exported app using Developer ID, a secure
-timestamp and hardened runtime. `tools/macos_entitlements.plist` deliberately has
-no exceptions: this GDScript-only game needs no JIT, native plug-ins or debugging
-entitlements. After submitting, it records the submission ID and archive hash in
-`macos/notarization.json` inside the build directory. It waits up to ten minutes.
-Only **Accepted** submissions proceed to stapling, ticket/signature validation,
-Gatekeeper assessment, and a new ZIP containing the stapled app.
+Use Godot **4.7.2** with matching export templates. On this Mac the executable is
+`/Applications/Godot.app/Contents/MacOS/Godot`. Python tools use the standard library.
+Run commands from the repository root.
 
-Check Apple's status without rebuilding:
+### Structure and decisions
 
-```sh
-xcrun notarytool history --keychain-profile NuggetCat-notary
-xcrun notarytool info <submission-id> --keychain-profile NuggetCat-notary
-xcrun notarytool log <submission-id> --keychain-profile NuggetCat-notary
-```
+itch.io is the main home for desktop downloads and browser play. Native iPad
+testing uses TestFlight, with an App Store release considered afterward. Tablet
+work does not block the desktop/Web release; iPhone and Android are optional.
 
-If Apple takes longer, the submission continues processing. Resume from the same
-output directory; this does not re-sign or submit another copy:
+| Path | Responsibility |
+|---|---|
+| `scripts/game.gd` | Round policy, ordered simulation phases, input, rendering and persistence |
+| `scripts/game_audio.gd` | Audio players, looping, synchronized stems, reactions and volumes |
+| `scripts/nugget.gd` | Typed mutable flight/bite state |
+| `scripts/difficulty.gd` | Named pacing stages for throws, flight time and music rate |
+| `scripts/screen_layout.gd` | Screen enum, shared button geometry and hit testing |
+| `scripts/platform_policy.gd` | Platform-specific Quit/fullscreen behavior |
+| `scripts/cat_appearance.gd` | Validated indexed palettes and cached recolored textures |
+| `scripts/room_background.gd` | Room selection and drawing |
+| `main.tscn` | Node2D game root and Audio child |
+| `assets/` | Runtime sprites, metadata, font, audio and editable MIDI sources |
+| `art_sources/` | Retained game source images, request metadata and sound references |
+| `web/shell.html` | Branded Web loader with progress/error reporting |
+| `tools/` | Asset preparation, previews, checks and release automation |
+| `release.json` / `itch.json` | Release/engine pins, signing configuration and upload destinations |
 
-```sh
-# Finish a standalone local build.
-python3 tools/notarize_macos.py build --resume
+The logical canvas is **640 × 360**, rendered with integer scaling and nearest
+filtering. The desktop window starts at 1280 × 720. `_step(delta)` orders
+simulation phases; `_draw()` only renders. Route navigation through game helpers
+and keep inactive overlay-background controls out of hit testing. Input Map
+actions are defined in `project.godot`.
 
-# Finish a retained deployment build and upload it after acceptance.
-python3 tools/deploy_itch.py --resume build/itch/<version>-<timestamp>
-```
+Golden collection runs after nugget iteration to avoid invalidating indices.
+Preserve `_eat_nugget(nugget, false)` in the sweep to avoid recursive collection.
 
-Notarization logs stay in that directory's `logs/`. Rejection or timeout stops
-deployment. The archive hash must match the receipt before resuming or uploading.
-Use a fresh build directory for a new submission after changing the app.
-`python3 tools/test_release.py` checks failure gates without contacting services.
-First submission on 2026-10-10: `fd5864c5-a387-45cb-84ad-9b4b5df2b81c`, still
-processing at the last check; the itch.io Mac download remains the earlier
-ad-hoc-signed build until acceptance and upload.
-
-## itch.io deployment
-
-The configured destination is **https://gorbunov.itch.io/nugget-cat** (`itch.json`).
-The draft page's first **0.11.5** upload was processed on all three channels on
-2026-10-10; embedded play and install/update checks remain to be completed.
-Create the project in the itch.io dashboard before the first upload. Start with
-**Draft** visibility, title **Nugget Cat**, slug **nugget-cat**, and kind **HTML**.
-Butler uploads builds; page creation, description, screenshots and visibility are
-managed in the itch.io dashboard.
-
-Install [Butler](https://itch.io/docs/butler/installing.html) into `build/butler/`
-or on PATH. This Mac uses the `darwin-arm64` distribution; the initially verified
-version is **15.32.0**. Authenticate once in your own terminal:
+### Verification
 
 ```sh
-build/butler/butler login
-
-# Build/check payloads without uploading to itch.io (Mac still submits to Apple).
-python3 tools/deploy_itch.py --dry-run
-
-# Build, test and upload macOS, Windows and browser releases.
-python3 tools/deploy_itch.py
-
-# Or update only the browser channel.
-python3 tools/deploy_itch.py --targets web
+GODOT=/Applications/Godot.app/Contents/MacOS/Godot
+"$GODOT" --headless --path . --editor --import --quit
+"$GODOT" --headless --path . -- --smoke-test
+"$GODOT" --headless --path . --script tools/test_nuggets.gd
+python3 tools/check_audio.py
+python3 tools/test_release.py
 ```
 
-`release.json` supplies `--userversion`; bump it before a new release. Channels are
-`mac`, `windows` and `html5`. Each deployment uses a fresh directory under
-`build/itch/<version>-<UTC timestamp>/`, retaining artifacts, build logs and a
-`deployment.json` receipt of completed uploads. Desktop uploads use the packaged
-ZIP contents (avoiding duplicate app/EXE plus archive uploads); the Web upload
-contains the whole fresh export with `index.html` at its root. All selected
-exports and checks finish before any upload starts. Uploads are sequential, not
-atomic: if a later upload fails, the receipt records earlier successful channels;
-rerun for the remaining targets. Butler handles incremental updates.
+Smoke checks cover rounds, pacing, palettes, music, persistence and navigation
+without intervening draws. Nugget tests cover bites, hazards, bonuses, collection
+and spawn odds. Test scenes set `game.test_mode = true` before entering the tree;
+this disables live processing and normal save access. Persistence tests use
+disposable `build/test_save.cfg`. Audio checks cover format, headroom, loop seams
+and matching finale-stem lengths. Release tests cover rejection/tampering gates.
 
-Mac deployments automatically require notarization, including during `--dry-run`
-(which only suppresses itch.io uploads). Pending/failed notarization prevents
-uploads. `--resume` uses the retained build version and targets from `build.json`,
-finishes Apple's submission, and uploads without rebuilding; `--targets` can
-limit it to a subset of the platforms in that retained build.
-
-After the first upload, on **Edit game**:
-- Mark `html5` as **This file will be played in the browser**.
-- Set the embedded viewport to **960 × 540**, enable the fullscreen button, and
-  use **Click to launch**. Leave mobile-friendly and SharedArrayBuffer support off.
-- Verify the `mac` and `windows` platform checkboxes, enable comments for feedback,
-  and save. Test browser play/fullscreen, desktop installation and later updates.
-- Include the parent-and-child story and AI disclosure above, plus all three CC0
-  sound credits. Normal downloaded-Mac launch testing and Windows-device
-  validation remain in the roadmap.
-
-This is an explicitly triggered local release pipeline. `--butler` / `BUTLER`
-and `--godot` / `GODOT` override executable paths. An unattended runner can supply
-`BUTLER_API_KEY` from its secret store; never put tokens in `itch.json` or Git.
-Hosted CI is a later step after proving this local deployment and provisioning
-the pinned engine/templates and macOS signing environment on a runner.
-
-### itch.io game-page theme
-
-Prepared uploads are in `art_sources/itch_game/`. This theme uses the active game
-sprites and bitmap logo in a plum/cream/golden palette, with a muted repeating
-nugget background. `page-preview.png` is an illustrative layout, not a screenshot
-of the live page. `theme.json` retains exact colors, typography, source references
-and layout settings. No new image-generation request is needed.
-
-On the game page, choose **Edit theme**:
-- Banner: `banner.png` (960 × 320).
-- Background: `background.png` (320 × 320), repeat both axes at native size.
-- BG `#2B2332`; BG2 `#403547`, fully opaque; text `#FFEDBD`.
-- Links `#EE9AAA`; buttons `#A84865`; headings `#FFC76B`.
-- Body font: **Nunito**, approximately 17–18px; headings: **Pixelify Sans**.
-- Screenshots: **Hidden** for a single-column browser-game layout. Embed selected
-  screenshots in the description instead. Keep the story, AI disclosure and CC0
-  sound credits as actual selectable page text.
-
-On **Edit game**, upload `cover.png` (630 × 500) as the cover image. Save the theme
-and use `embed-cover.png` (960 × 540) as the embedded game's background image for
-**Click to launch**. Its center leaves space for itch.io's own launch button. Save
-and check both wide and narrow browser layouts. These files are prepared locally;
-applying them to the live page requires the itch.io theme editor.
-
-Regenerate artwork offline (the layout preview uses `build/previews/gameplay.png`):
+Visual checks require a graphical session, **not** `--headless`:
 
 ```sh
-/Applications/Godot.app/Contents/MacOS/Godot --headless --path . --script tools/prepare_itch_game.gd
+"$GODOT" --path . --script tools/preview.gd
+"$GODOT" --path . --script tools/preview.gd -- --rooms --bites --boss
+"$GODOT" --path . --script tools/preview.gd -- --check-settings
 ```
 
-## First playtest
+Screenshots are regenerated into `build/previews/`. Other flags include `--hands`,
+`--cat-colors`, `--dance`, `--sources` and `--check-title-fullscreen`. User flags go
+after `--`. Preview screenshots and editor/Python caches are disposable; retained
+release archives, receipts and notarization logs are not temporary scratch files.
 
-Try a full round and a replay. Feedback for the next iteration:
+### Game assets
 
-1. Is the mouth target clear, and are catches forgiving enough?
-2. Does the ramp from gentle throws to the finale feel right?
-3. Should the cat be bigger, floppier, or more unhinged?
-4. Does the chiptune feel cheerful or get repetitive?
+`assets/cat_indexed.png` and `assets/cat_dance_indexed.png` are data: red bytes
+encode palette-role IDs. Edit colors in `assets/cat_palettes.json`; geometry,
+roles and anchors live in the corresponding sprite JSON files. Keep role IDs
+stable, imports lossless, mipmaps disabled and `process/fix_alpha_border=false`.
+`cat_appearance.gd` validates metadata and lazily caches recolored textures.
 
-Game art, font glyphs, melodies and synthesized effects are generated specifically
-for this project; crowd/gulp reactions use the credited CC0 recordings above.
-Python tools require no external libraries.
-The v0.7 hands were generated with OpenAI's `gpt-image-2.5-flare`, then processed
-locally into three aligned 64×48 pixel-art frames: ready, wind-up and release.
-The original PNG and non-secret request metadata are retained in `art_sources/`.
-The game uses `assets/hands_ai.png`; procedural asset regeneration preserves it.
+Offline converters preserve the active source selection:
 
-To request another candidate (this makes a billed API request):
+| Converter | Output |
+|---|---|
+| `prepare_hands.gd` | Three-frame hand atlas from `hands_v001.png` |
+| `prepare_cat.gd` | Indexed cat atlas, palette preview and icon from `cat_v001.png` |
+| `prepare_cat_dance.gd` | Indexed dance atlas from `cat_dance_v001.png` |
+| `prepare_nuggets.gd` | Six-frame nugget atlas from `nuggets_v001.png` |
+| `prepare_nugget_bites.gd` | Bite overlays from the active nugget atlas |
+| `prepare_rooms.gd` | Four 640 × 360 rooms from `room_*_v002.png` |
+| `prepare_boot_splash.gd` | Shared native/Web startup artwork |
+| `generate_reactions.py` | CC0 recordings converted to WAV using macOS `afconvert` |
+
+Run GDScript converters with `"$GODOT" --headless --path . --script tools/<name>.gd`,
+then import before tests/export. `generate_nugget_sprites.gd` is a procedural
+fallback that **overwrites** the active nugget atlas. `generate_assets.py` and
+`compose_music.py` generate procedural assets/music; `generate_ai_hands.py` is the
+hands-specific API helper. Keep game source art, runtime assets, `.import`, `.uid`
+and `.gdignore` files tracked; `.godot/` and `build/` are ignored outputs.
+
+To configure image-generation credentials:
 
 ```sh
-python3 tools/generate_ai_hands.py --name hands_v002
-python3 tools/generate_ai_art.py --asset cat --name cat_v002
-python3 tools/generate_ai_art.py --asset nuggets
-# After inspecting the generated nugget source:
-/Applications/Godot.app/Contents/MacOS/Godot --headless --path . --script tools/prepare_nuggets.gd
+python3 tools/setup_api_key.py
+python3 tools/generate_ai_art.py --check-key
 ```
 
-The generator never stores the API key. New candidates do not replace the active
-sprites automatically; `tools/prepare_hands.gd` records the selected source and
-its wrist anchors, and `tools/prepare_cat.gd` records cat frame alignment. The
-v0.9 cat sheet also used `gpt-image-2.5-flare`. Source PNGs, prompts and non-secret
-request metadata are retained for both assets. Enlarged previews are available
-in `art_sources/`.
+Credentials resolve from `OPENAI_API_KEY`, then macOS Keychain service
+`CatNuggetGame.OpenAI`. Setup uses a hidden prompt and verifies Keychain read-back;
+the availability check makes no API request and never displays the key.
+
+New artwork makes one billed request with no automatic retries. Use a fresh name:
+
+```sh
+python3 tools/generate_ai_art.py --asset nuggets --name nuggets_v002
+python3 tools/generate_ai_art.py --asset rooms --room kitchen --quality high --name room_kitchen_v003
+```
+
+Generating a candidate does not activate it: inspect it, change the converter's
+selected source, run the converter, and import. Existing source PNGs are protected.
+
+## Sound credits
+
+These recordings use [CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/).
+Conversion uses mono WAV, normalized peaks and short edge fades; pitch is unchanged.
+
+| Use | Recording | Creator | Edit |
+|---|---|---|---|
+| Burnt nugget | [Small crowd reactions](https://freesound.org/people/IENBA/sounds/488472/) | IENBA | First two seconds |
+| Golden / big golden | [yay.mp3](https://freesound.org/people/zut50/sounds/162395/) | zut50 | Full clip |
+| Big regular | [gulpCartoony.mp3](https://freesound.org/people/gary_in_wv/sounds/449868/) | gary_in_wv | Full clip |
+
+`art_sources/reactions.json` retains source URLs, license references and clip
+boundaries. The in-game Sources panel also links these credits and credits Godot.

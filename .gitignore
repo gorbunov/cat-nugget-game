@@ -16,6 +16,14 @@ venv/
 .mypy_cache/
 .ruff_cache/
 
+# Disposable editor/scratch files.
+*.tmp
+*.temp
+*.bak
+*.swp
+*.swo
+*~
+
 # Local environment variables / API keys.
 .env
 .env.*
