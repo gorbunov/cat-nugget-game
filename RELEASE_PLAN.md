@@ -7,8 +7,10 @@ macOS, Windows and single-threaded Web exports now succeed using installed Godot
 4.7.2 templates. Safari and Chrome passed user playtesting on 2026-10-10;
 Firefox is deferred by the owner. Next: macOS public-download signing/notarization
 (Step 2), Windows device testing (Step 3), and itch.io embedded-browser checks.
-Publishing/upload
-automation and native tablet controls are still later milestones.
+Local publishing automation is implemented in `tools/deploy_itch.py`. The owner
+created the draft itch.io page and version 0.11.5 was uploaded and processed on
+all three channels on 2026-10-10. Embedded play, install/update verification and
+native tablet controls remain pending.
 
 ## Distribution decision
 
@@ -58,7 +60,7 @@ HTML/WASM correctly. Export success is not Windows/browser gameplay validation.
   headers are required.
 
 ### 2. Prepare macOS for public downloads
-- [ ] Configure Developer ID Application signing, hardened runtime and appropriate
+- [x] Configure Developer ID Application signing, hardened runtime and appropriate
   entitlements using the Apple Developer account.
 - [ ] Automate notarization with `notarytool`, then staple the accepted ticket.
 - [ ] Package the app for itch.io while preserving its bundle and signature.
@@ -66,6 +68,17 @@ HTML/WASM correctly. Export success is not Windows/browser gameplay validation.
 
 **Done when:** the downloaded app verifies and launches without a Gatekeeper
 workaround. Direct distribution does not require a Mac App Store listing.
+
+**In progress 2026-10-10:** Developer ID signing (team `B5U2KSR3KF`), secure
+timestamp and hardened runtime verified. Keychain profile `NuggetCat-notary`
+works. `tools/notarize_macos.py` implements submission, resumable status polling,
+stapling, validation and repackaging; itch deployments now require these checks.
+Initial submission `fd5864c5-a387-45cb-84ad-9b4b5df2b81c` remains **In Progress**
+at the last check. Retained build:
+`build/itch/0.11.5-20261010T124553910938Z`. Resume with
+`python3 tools/deploy_itch.py --resume build/itch/0.11.5-20261010T124553910938Z`.
+No notarized replacement has been uploaded yet. Acceptance, ticket/Gatekeeper
+checks and an actual browser-download launch remain to be verified.
 
 ### 3. Validate Windows
 - [ ] Test on a real Windows machine: startup, mouse catches, audio, fullscreen,
@@ -77,15 +90,21 @@ workaround. Direct distribution does not require a Mac App Store listing.
 **Done when:** a tester can download, extract and play complete rounds reliably.
 
 ### 4. Create the itch.io page and upload desktop builds
-- [ ] Start with a draft or restricted page.
+- [x] Start with a draft or restricted page (owner confirmed creation).
 - [ ] Add screenshots, description, controls, requirements, feedback route and
   version notes.
 - [ ] Include the parent-and-child project story, AI images/music disclosure and
   third-party sound credits from README and `art_sources/reactions.json`.
-- [ ] Configure Butler and separate macOS/Windows upload channels.
+- [x] Configure Butler and separate macOS/Windows upload channels.
 - [ ] Verify both initial installation and a subsequent update.
 
 **Done when:** testers get both desktop builds from one page and can update them.
+
+**Uploaded 2026-10-10:** `gorbunov/nugget-cat`, version **0.11.5**. Butler confirmed
+processed builds on `mac` (#2099799), `windows` (#2099807), and `html5` (#2099810).
+The local dry run and real pipeline passed import, smoke, nugget and audio checks,
+all exports, and macOS signature verification. Browser tagging/page presentation
+and actual itch.io play/install/update checks are still pending.
 
 ### 5. Make browser play comfortable
 - [x] Implement audio start after a user interaction; actual browser autoplay
@@ -129,7 +148,7 @@ the "Made with Godot" engine credit.
 
 ### 8. Automate releases and publish
 - [ ] First prove local release scripts on the Mac; then move the workflow to CI.
-- [ ] Use an explicit release command or manually triggered workflow initially,
+- [x] Use an explicit release command or manually triggered workflow initially,
   rather than publishing every commit.
 - [ ] Automate import, tests, exports, signing/notarization, packaging and uploads.
 - [ ] Retain release artifacts and matching version notes.
@@ -145,17 +164,23 @@ and updates the selected distribution channels.
 updates for users of the itch.io app. Configure the project page, platform labels
 and browser-play settings separately during initial setup.
 
-Illustrative commands; replace placeholders after choosing the account, project
-slug and artifact layout:
+The destination and channels are configured in `itch.json` as
+`gorbunov/nugget-cat` (`mac`, `windows`, `html5`). The local pipeline builds into a
+fresh retained directory, runs import/game/audio checks, exports all selected
+targets, then pushes them with Butler and the version from `release.json`:
 
 ```sh
-butler push <mac-build-folder> <account>/nugget-cat:mac --userversion <version>
-butler push <windows-build-folder> <account>/nugget-cat:windows --userversion <version>
-butler push <web-build-folder> <account>/nugget-cat:html5 --userversion <version>
+build/butler/butler login
+python3 tools/deploy_itch.py --dry-run
+python3 tools/deploy_itch.py
 ```
 
 Keep Apple signing material, notarization credentials and Butler tokens outside
 the repository, using Keychain locally and secret storage in CI.
+Butler login manages its own local credential store. See README's itch.io
+deployment section for page settings, partial-upload recovery and runner setup.
+Signing/notarization automation is implemented; the first submission is pending
+Apple's processing. Hosted CI is not yet implemented.
 
 ## Publication context to preserve
 

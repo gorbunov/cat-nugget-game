@@ -1,0 +1,43 @@
+{
+  "concept": "Nugget Cat — warm pixel-art snack break",
+  "project": "https://gorbunov.itch.io/nugget-cat",
+  "banner": "banner.png",
+  "banner_dimensions": [960, 320],
+  "cover": "cover.png",
+  "cover_dimensions": [630, 500],
+  "embed_cover": "embed-cover.png",
+  "embed_cover_dimensions": [960, 540],
+  "embed_cover_note": "Quiet plum cat/nugget silhouettes, gold separator lines and a small bottom tagline complement the banner without repeating its logo. Upload as embedded-game background for click-to-launch; the center is reserved for itch.io's launch button.",
+  "background": "background.png",
+  "background_dimensions": [320, 320],
+  "preview": "page-preview.png",
+  "preview_note": "Illustrative layout, not a live itch.io capture. Use readable body typography in the actual editor.",
+  "colors": {
+    "BG": "#2B2332",
+    "BG2": "#403547",
+    "BG2_Alpha": 1.0,
+    "Text": "#FFEDBD",
+    "Link": "#EE9AAA",
+    "Buttons": "#A84865",
+    "Headers": "#FFC76B"
+  },
+  "background_display": {
+    "repeat": "repeat both axes",
+    "position": "top center",
+    "size": "native size, no stretch or cover",
+    "attachment": "scroll"
+  },
+  "typography": {
+    "body": "Nunito, 17–18px; fallback sans-serif",
+    "headings": "Pixelify Sans; fallback sans-serif",
+    "note": "Select via itch.io's Google Fonts picker. Pixel logo lettering is already baked into the banner."
+  },
+  "layout": {
+    "screenshots": "Hidden (single column); embed selected screenshots in description",
+    "embed": "960 × 540, click to launch, fullscreen enabled",
+    "description_order": ["Short pitch", "Gameplay screenshot", "Controls", "Parent-and-child story", "AI disclosure and sound credits", "Feedback invitation"]
+  },
+  "asset_sources": ["assets/cat_indexed.png", "assets/cat_palettes.json", "assets/nuggets.png", "assets/pixel_font.png"],
+  "generation": "Offline composition of existing artwork; no new AI request. Run tools/prepare_itch_game.gd with Godot.",
+  "disclosure": "Game images and music use AI generation. Crowd/gulp audio consists of separate CC0 recordings credited in README and art_sources/reactions.json. Carry these disclosures and sound links into the game-page description."
+}

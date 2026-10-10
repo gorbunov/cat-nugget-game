@@ -1,16 +1,19 @@
 """Sync release.json, verify the pinned Godot, test, and export local platform builds.
 
 Uses matching templates installed through Godot's Export Template Manager.
-No signing credentials or publishing services are used by this baseline builder.
+Use --notarize to Developer ID sign and notarize the macOS build with Keychain credentials.
 """
 import argparse
 import json
 import os
 from pathlib import Path
 import re
+import shutil
 import subprocess
 import sys
 import zipfile
+
+from notarize_macos import notarize
 
 ROOT = Path(__file__).resolve().parents[1]
 TARGETS = {
@@ -57,17 +60,24 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--godot', default=os.environ.get('GODOT', '/Applications/Godot.app/Contents/MacOS/Godot'))
     parser.add_argument('--targets', nargs='+', choices=TARGETS, default=list(TARGETS))
+    parser.add_argument('--output-dir', type=Path, default=ROOT / 'build',
+                        help='Export/log directory inside build/ (default: build/)')
     parser.add_argument('--sync-only', action='store_true')
     parser.add_argument('--check-version', action='store_true')
+    parser.add_argument('--notarize', action='store_true', help='Sign and notarize the macOS export for distribution')
     args = parser.parse_args()
     release = sync_versions(check=args.check_version)
     if args.sync_only or args.check_version:
         print(f'Release metadata aligned: {release["version"]}; Godot {release["godot"]}')
         return
+    if args.notarize and ('macos' not in args.targets or sys.platform != 'darwin'):
+        raise ValueError('--notarize requires a macOS target and a macOS host')
     actual = subprocess.check_output([args.godot, '--version'], cwd=ROOT, text=True).strip()
     if not actual.startswith(release['godot'] + '.stable.'):
         raise ValueError(f'Expected Godot {release["godot"]}.stable; found {actual}')
-    build = ROOT / 'build'
+    build = args.output_dir.resolve()
+    if not build.is_relative_to(ROOT / 'build'):
+        raise ValueError('--output-dir must be inside build/')
     logs = build / 'logs'
     logs.mkdir(parents=True, exist_ok=True)
     (build / '.gdignore').touch()
@@ -101,12 +111,21 @@ def main():
         if not artifact.is_file():
             raise RuntimeError(f'Missing exported artifact: {artifact}')
         if target == 'macos' and sys.platform == 'darwin':
+            app = folder / 'Nugget Cat.app'
+            if app.exists():
+                shutil.rmtree(app)
             run('unpack-macos', ['ditto', '-x', '-k', str(artifact), str(folder)])
             run('verify-macos', ['codesign', '--verify', '--deep', '--strict', str(folder / 'Nugget Cat.app')])
         if target == 'windows':
             with zipfile.ZipFile(folder / 'Nugget Cat-windows.zip', 'w', zipfile.ZIP_DEFLATED) as archive:
                 archive.write(artifact, artifact.name)
         print(f'Built {release["version"]}: {artifact.relative_to(ROOT)}', flush=True)
+    (build / 'build.json').write_text(json.dumps({
+        'version': release['version'], 'targets': list(dict.fromkeys(args.targets)),
+        'checks_passed': True,
+    }, indent=2) + '\n')
+    if args.notarize:
+        notarize(build)
 
 
 if __name__ == '__main__':

@@ -1,0 +1,8 @@
+{
+  "project": "gorbunov/nugget-cat",
+  "channels": {
+    "macos": "mac",
+    "windows": "windows",
+    "web": "html5"
+  }
+}

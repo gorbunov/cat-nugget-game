@@ -39,7 +39,7 @@ def read_api_key():
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--model', default='gpt-image-2.5-flare')
-    parser.add_argument('--asset', choices=['hands', 'cat', 'cat_dance', 'nuggets', 'rooms'], default='hands')
+    parser.add_argument('--asset', choices=['hands', 'cat', 'cat_dance', 'nuggets', 'rooms', 'profile_banner', 'profile_banner_blend', 'profile_background', 'profile_stars'], default='hands')
     parser.add_argument('--name', default=None)
     parser.add_argument('--quality', choices=['low', 'medium', 'high'], default='medium')
     parser.add_argument('--room', choices=['kitchen', 'cafe', 'sunroom', 'study'], help='Generate one detailed room rather than a four-room sheet')
@@ -62,7 +62,7 @@ def main():
     prompt = (ROOT / 'tools' / 'prompts' / (args.asset + '.txt')).read_text()
     if args.room:
         prompt = (ROOT / 'tools' / 'prompts' / 'rooms_hd.txt').read_text() + '\n\n' + (ROOT / 'tools' / 'prompts' / ('room_' + args.room + '.txt')).read_text()
-    background = 'opaque' if args.asset == 'rooms' else 'transparent'
+    background = 'opaque' if args.asset in ('rooms', 'profile_banner', 'profile_background', 'profile_stars') else 'transparent'
     payload = dict(model=args.model, prompt=prompt, n=1, size='1536x1024',
                    quality=args.quality, background=background, output_format='png')
     request = urllib.request.Request(

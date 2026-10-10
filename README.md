@@ -449,8 +449,151 @@ Web and native startup use `assets/boot_splash.png`, prepared offline from the
 happy ginger cat with `tools/prepare_boot_splash.gd`. The Sources screen includes
 the **Made with Godot** credit.
 
-The macOS app is a local playtest release, ad-hoc signed rather than notarized
-for public distribution. The source project is also playable directly in Godot.
+Default local macOS builds are ad-hoc-signed playtests. Add `--notarize` for a
+Developer ID signed and notarized distribution build (see below). The source
+project is also playable directly in Godot.
+
+### macOS signing and notarization
+
+`release.json` contains the public signing identity and Keychain profile name.
+The certificate/private key and notarization credentials live in macOS Keychain.
+This Mac uses **Developer ID Application: Oleg Gorbunov (B5U2KSR3KF)** and
+**NuggetCat-notary**. `MACOS_SIGNING_IDENTITY` and `NOTARY_KEYCHAIN_PROFILE` can
+override those names on another Mac. Set up credentials interactively with:
+
+```sh
+xcrun notarytool store-credentials "NuggetCat-notary"
+```
+
+Build a public-distribution Mac archive without uploading to itch.io:
+
+```sh
+python3 tools/build_release.py --targets macos --notarize
+```
+
+`tools/notarize_macos.py` re-signs the exported app using Developer ID, a secure
+timestamp and hardened runtime. `tools/macos_entitlements.plist` deliberately has
+no exceptions: this GDScript-only game needs no JIT, native plug-ins or debugging
+entitlements. After submitting, it records the submission ID and archive hash in
+`macos/notarization.json` inside the build directory. It waits up to ten minutes.
+Only **Accepted** submissions proceed to stapling, ticket/signature validation,
+Gatekeeper assessment, and a new ZIP containing the stapled app.
+
+Check Apple's status without rebuilding:
+
+```sh
+xcrun notarytool history --keychain-profile NuggetCat-notary
+xcrun notarytool info <submission-id> --keychain-profile NuggetCat-notary
+xcrun notarytool log <submission-id> --keychain-profile NuggetCat-notary
+```
+
+If Apple takes longer, the submission continues processing. Resume from the same
+output directory; this does not re-sign or submit another copy:
+
+```sh
+# Finish a standalone local build.
+python3 tools/notarize_macos.py build --resume
+
+# Finish a retained deployment build and upload it after acceptance.
+python3 tools/deploy_itch.py --resume build/itch/<version>-<timestamp>
+```
+
+Notarization logs stay in that directory's `logs/`. Rejection or timeout stops
+deployment. The archive hash must match the receipt before resuming or uploading.
+Use a fresh build directory for a new submission after changing the app.
+`python3 tools/test_release.py` checks failure gates without contacting services.
+First submission on 2026-10-10: `fd5864c5-a387-45cb-84ad-9b4b5df2b81c`, still
+processing at the last check; the itch.io Mac download remains the earlier
+ad-hoc-signed build until acceptance and upload.
+
+## itch.io deployment
+
+The configured destination is **https://gorbunov.itch.io/nugget-cat** (`itch.json`).
+The draft page's first **0.11.5** upload was processed on all three channels on
+2026-10-10; embedded play and install/update checks remain to be completed.
+Create the project in the itch.io dashboard before the first upload. Start with
+**Draft** visibility, title **Nugget Cat**, slug **nugget-cat**, and kind **HTML**.
+Butler uploads builds; page creation, description, screenshots and visibility are
+managed in the itch.io dashboard.
+
+Install [Butler](https://itch.io/docs/butler/installing.html) into `build/butler/`
+or on PATH. This Mac uses the `darwin-arm64` distribution; the initially verified
+version is **15.32.0**. Authenticate once in your own terminal:
+
+```sh
+build/butler/butler login
+
+# Build/check payloads without uploading to itch.io (Mac still submits to Apple).
+python3 tools/deploy_itch.py --dry-run
+
+# Build, test and upload macOS, Windows and browser releases.
+python3 tools/deploy_itch.py
+
+# Or update only the browser channel.
+python3 tools/deploy_itch.py --targets web
+```
+
+`release.json` supplies `--userversion`; bump it before a new release. Channels are
+`mac`, `windows` and `html5`. Each deployment uses a fresh directory under
+`build/itch/<version>-<UTC timestamp>/`, retaining artifacts, build logs and a
+`deployment.json` receipt of completed uploads. Desktop uploads use the packaged
+ZIP contents (avoiding duplicate app/EXE plus archive uploads); the Web upload
+contains the whole fresh export with `index.html` at its root. All selected
+exports and checks finish before any upload starts. Uploads are sequential, not
+atomic: if a later upload fails, the receipt records earlier successful channels;
+rerun for the remaining targets. Butler handles incremental updates.
+
+Mac deployments automatically require notarization, including during `--dry-run`
+(which only suppresses itch.io uploads). Pending/failed notarization prevents
+uploads. `--resume` uses the retained build version and targets from `build.json`,
+finishes Apple's submission, and uploads without rebuilding; `--targets` can
+limit it to a subset of the platforms in that retained build.
+
+After the first upload, on **Edit game**:
+- Mark `html5` as **This file will be played in the browser**.
+- Set the embedded viewport to **960 × 540**, enable the fullscreen button, and
+  use **Click to launch**. Leave mobile-friendly and SharedArrayBuffer support off.
+- Verify the `mac` and `windows` platform checkboxes, enable comments for feedback,
+  and save. Test browser play/fullscreen, desktop installation and later updates.
+- Include the parent-and-child story and AI disclosure above, plus all three CC0
+  sound credits. Normal downloaded-Mac launch testing and Windows-device
+  validation remain in the roadmap.
+
+This is an explicitly triggered local release pipeline. `--butler` / `BUTLER`
+and `--godot` / `GODOT` override executable paths. An unattended runner can supply
+`BUTLER_API_KEY` from its secret store; never put tokens in `itch.json` or Git.
+Hosted CI is a later step after proving this local deployment and provisioning
+the pinned engine/templates and macOS signing environment on a runner.
+
+### itch.io game-page theme
+
+Prepared uploads are in `art_sources/itch_game/`. This theme uses the active game
+sprites and bitmap logo in a plum/cream/golden palette, with a muted repeating
+nugget background. `page-preview.png` is an illustrative layout, not a screenshot
+of the live page. `theme.json` retains exact colors, typography, source references
+and layout settings. No new image-generation request is needed.
+
+On the game page, choose **Edit theme**:
+- Banner: `banner.png` (960 × 320).
+- Background: `background.png` (320 × 320), repeat both axes at native size.
+- BG `#2B2332`; BG2 `#403547`, fully opaque; text `#FFEDBD`.
+- Links `#EE9AAA`; buttons `#A84865`; headings `#FFC76B`.
+- Body font: **Nunito**, approximately 17–18px; headings: **Pixelify Sans**.
+- Screenshots: **Hidden** for a single-column browser-game layout. Embed selected
+  screenshots in the description instead. Keep the story, AI disclosure and CC0
+  sound credits as actual selectable page text.
+
+On **Edit game**, upload `cover.png` (630 × 500) as the cover image. Save the theme
+and use `embed-cover.png` (960 × 540) as the embedded game's background image for
+**Click to launch**. Its center leaves space for itch.io's own launch button. Save
+and check both wide and narrow browser layouts. These files are prepared locally;
+applying them to the live page requires the itch.io theme editor.
+
+Regenerate artwork offline (the layout preview uses `build/previews/gameplay.png`):
+
+```sh
+/Applications/Godot.app/Contents/MacOS/Godot --headless --path . --script tools/prepare_itch_game.gd
+```
 
 ## First playtest
 

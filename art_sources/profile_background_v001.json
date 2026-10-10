@@ -1,0 +1,27 @@
+{
+  "request": {
+    "model": "gpt-image-2.5-flare",
+    "prompt": "Create a quiet decorative website BACKGROUND for an indie creator profile, coordinated with the theme SMALL WORLDS WORKSHOP: tiny imaginary worlds and a parent and child making games together. Landscape canvas. Original clean pixel-art design with intentional sparse pixel clusters and an almost flat midnight navy #182331 ground. Limited extremely subdued palette: slightly lighter desaturated navy #223143 and slate teal #29444C, tiny occasional muted amber #60513F. The background will sit BEHIND a web page, so it must be very LOW CONTRAST, spacious and atmospheric, never demanding attention. At least 85 percent is empty midnight navy negative space. The entire central 65 percent of the width is virtually empty dark navy to accommodate readable profile content. Only near the far left and far right margins, scatter a very few small pixel constellations, tiny paper rockets, simple ringed planets, a tiny pencil and abstract floating island silhouettes, all subtle and unobtrusive. No dominant subject, no cat character, no characters, no large bright objects, no glow bloom, no text, no letters, no words, no logos, no watermarks, no interface or frames. Fade all decorative marks gently to a perfectly solid #182331 along all four outside borders so the image naturally blends into a matching website background color. This is a supporting backdrop, not another banner or a screenshot. Beautiful restrained spacing, cozy night sky, quiet imaginative feeling.\n",
+    "n": 1,
+    "size": "1536x1024",
+    "quality": "medium",
+    "background": "opaque",
+    "output_format": "png"
+  },
+  "request_id": "req_551b9bbe71914a408f7a12d5d14a1fd1",
+  "created": 1791633094,
+  "usage": {
+    "input_tokens": 296,
+    "input_tokens_details": {
+      "image_tokens": 0,
+      "text_tokens": 296
+    },
+    "output_tokens": 343,
+    "output_tokens_details": {
+      "image_tokens": 343,
+      "text_tokens": 0
+    },
+    "total_tokens": 639
+  },
+  "revised_prompt": null
+}
