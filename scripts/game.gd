@@ -6,6 +6,9 @@ const ROUND_LENGTH := 60.0
 const HAND_RELEASE_TIME := 0.72
 const HAND_LIFETIME := 1.15
 const CATCH_RADIUS := 18.0
+const CAT_MIN := Vector2(20, 62)
+const CAT_MAX := Vector2(620, 326)
+const TOUCH_MOUTH_OFFSET := Vector2(0, -64)
 const CHOMP_INTERVAL := 0.20
 const BOSS_BITES := 40
 const BOSS_BONUS := 500
@@ -68,6 +71,8 @@ const ScreenLayout := preload("res://scripts/screen_layout.gd")
 const Screen := ScreenLayout.Screen
 const RoomBackground := preload("res://scripts/room_background.gd")
 const PlatformPolicy := preload("res://scripts/platform_policy.gd")
+const DisplayLayout := preload("res://scripts/display_layout.gd")
+var display_layout := DisplayLayout.new()
 var platform := PlatformPolicy.new()
 var browser_audio_started := false
 
@@ -101,6 +106,9 @@ var volume_drag := -1
 var cat := Vector2(320, 180)
 var cat_previous := cat
 var cat_velocity := Vector2.ZERO
+var touch_mode := false
+var active_touch := -1
+var touch_target := cat
 var tilt := 0.0
 var expression := 0.0
 var offended := 0.0
@@ -153,6 +161,12 @@ var test_mode := false:
 
 func _ready() -> void:
 	texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+	var frame_layer := CanvasLayer.new()
+	frame_layer.layer = 10
+	add_child(frame_layer)
+	frame_layer.add_child(display_layout)
+	get_viewport().size_changed.connect(_update_display_layout)
+	_update_display_layout()
 	random.randomize()
 	title_snack_rng.randomize()
 	title_snack_wait = title_snack_rng.randf_range(5.0, 6.0)
@@ -221,6 +235,18 @@ func _start_panic_music() -> void:
 
 # ---- Window and screen transitions. ----
 
+func _update_display_layout() -> void:
+	var size := get_viewport_rect().size
+	display_layout.configure(size, DisplayLayout.device_safe_rect(size))
+	position = display_layout.play_rect.position
+	scale = Vector2.ONE * (display_layout.play_rect.size.x / 640)
+	if state == Screen.PLAYING:
+		_pause()
+	else:
+		active_touch = -1
+		volume_drag = -1
+	queue_redraw()
+
 func _toggle_fullscreen() -> void:
 	if not platform.supports_fullscreen():
 		return
@@ -243,6 +269,8 @@ func _toggle_fullscreen() -> void:
 func _change_screen(next_screen: ScreenLayout.Screen) -> void:
 	state = next_screen
 	volume_drag = -1
+	active_touch = -1
+	touch_target = cat
 	Input.mouse_mode = Input.MOUSE_MODE_HIDDEN if state == Screen.PLAYING else Input.MOUSE_MODE_VISIBLE
 	queue_redraw()
 
@@ -310,6 +338,10 @@ func _notification(what: int) -> void:
 		_save_settings()
 
 func _input(event: InputEvent) -> void:
+	# Touch has its own offset and UI routing; synthetic mouse events must not
+	# double-activate buttons or pull the mouth back underneath the finger.
+	if event is InputEventMouse and event.device == InputEvent.DEVICE_ID_EMULATION:
+		return
 	if platform.web and not browser_audio_started and (
 			(event is InputEventMouseButton and event.pressed)
 			or (event is InputEventKey and event.pressed and not event.echo)
@@ -317,6 +349,16 @@ func _input(event: InputEvent) -> void:
 		browser_audio_started = true
 		audio.playback_enabled = not test_mode
 		audio.restart_music()
+	if display_layout.portrait:
+		return
+	if event is InputEventScreenTouch or event is InputEventScreenDrag:
+		_handle_touch(make_input_local(event))
+		return
+	if event is InputEventMouse:
+		if active_touch >= 0:
+			return
+		if (event is InputEventMouseMotion and not event.relative.is_zero_approx()) or (event is InputEventMouseButton and event.pressed):
+			touch_mode = false
 	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT:
 		if not event.pressed and volume_drag >= 0:
 			volume_drag = -1
@@ -324,12 +366,12 @@ func _input(event: InputEvent) -> void:
 			return
 		if event.pressed and state == Screen.SETTINGS:
 			for i in range(3):
-				if _volume_slider_rect(i).grow(5).has_point(get_global_mouse_position()):
+				if _volume_slider_rect(i).grow(5).has_point(get_local_mouse_position()):
 					volume_drag = i
-					_drag_volume(get_global_mouse_position().x)
+					_drag_volume(get_local_mouse_position().x)
 					return
 	if event is InputEventMouseMotion and volume_drag >= 0:
-		_drag_volume(get_global_mouse_position().x)
+		_drag_volume(get_local_mouse_position().x)
 		return
 	if event is InputEventKey and event.pressed and not event.echo:
 		if event.is_action_pressed("toggle_fullscreen", false, true):
@@ -350,7 +392,52 @@ func _input(event: InputEvent) -> void:
 			elif state == Screen.PAUSED:
 				_resume()
 	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT and event.pressed:
-		_activate_button_at(get_global_mouse_position())
+		_activate_button_at(get_local_mouse_position())
+
+func _handle_touch(event: InputEvent) -> void:
+	if event is InputEventScreenTouch:
+		if event.canceled or not event.pressed:
+			if event.index == active_touch:
+				active_touch = -1
+				if volume_drag >= 0:
+					volume_drag = -1
+					_save_settings()
+			return
+		var in_game := Rect2(0, 0, 640, 360).has_point(event.position)
+		var in_drag_margin := state == Screen.PLAYING and display_layout.bottom_drag_contains(event.position)
+		if active_touch >= 0 or not (in_game or in_drag_margin):
+			return
+		touch_mode = true
+		active_touch = event.index
+		if state == Screen.SETTINGS:
+			for i in range(3):
+				if _volume_slider_rect(i).grow(5).has_point(event.position):
+					volume_drag = i
+					_drag_volume(event.position.x)
+					return
+		var action := ScreenLayout.action_at(state, event.position, platform.can_quit(), platform.supports_fullscreen())
+		if not action.is_empty():
+			_handle_action(action)
+		elif state == Screen.PLAYING:
+			touch_target = (event.position + TOUCH_MOUTH_OFFSET).clamp(CAT_MIN, CAT_MAX)
+	elif event is InputEventScreenDrag and event.index == active_touch:
+		if volume_drag >= 0:
+			_drag_volume(event.position.x)
+		elif state == Screen.PLAYING:
+			touch_target = (event.position + TOUCH_MOUTH_OFFSET).clamp(CAT_MIN, CAT_MAX)
+
+
+func _cat_input_position() -> Vector2:
+	return touch_target if touch_mode else get_local_mouse_position().clamp(CAT_MIN, CAT_MAX)
+
+
+func _update_cat_motion(delta: float) -> void:
+	cat_previous = cat
+	cat = _cat_input_position()
+	var velocity := (cat - cat_previous) / maxf(delta, 0.001)
+	cat_velocity = cat_velocity.lerp(velocity, 1.0 - exp(-12 * delta))
+	tilt = lerpf(tilt, clampf(cat_velocity.x / 2200, -0.24, 0.24), 1.0 - exp(-14 * delta))
+
 
 func _activate_button_at(pointer: Vector2) -> void:
 	var action := ScreenLayout.action_at(state, pointer, platform.can_quit(), platform.supports_fullscreen())
@@ -465,7 +552,8 @@ func _start_round() -> void:
 	hands.clear()
 	particles.clear()
 	popups.clear()
-	cat = get_global_mouse_position().clamp(Vector2(20, 62), Vector2(620, 326))
+	touch_target = Vector2(320, 180)
+	cat = _cat_input_position()
 	cat_previous = cat
 	cat_velocity = Vector2.ZERO
 	banner = "FOLLOW YOUR APPETITE!"
@@ -483,7 +571,7 @@ func _pause() -> void:
 func _resume() -> void:
 	_change_screen(Screen.PLAYING)
 	_set_music_rate(_difficulty_at(ROUND_LENGTH - remaining).music_rate)
-	cat = get_global_mouse_position().clamp(Vector2(20, 62), Vector2(620, 326))
+	cat = _cat_input_position()
 	cat_previous = cat
 	audio.resume_music()
 	if round_phase == RoundPhase.BOSS:
@@ -511,11 +599,7 @@ func _process(delta: float) -> void:
 				_pause()
 	clock += delta
 	if state == Screen.PLAYING:
-		cat_previous = cat
-		cat = get_global_mouse_position().clamp(Vector2(20, 62), Vector2(620, 326))
-		var velocity := (cat - cat_previous) / maxf(delta, 0.001)
-		cat_velocity = cat_velocity.lerp(velocity, 1.0 - exp(-12 * delta))
-		tilt = lerpf(tilt, clampf(cat_velocity.x / 2200, -0.24, 0.24), 1.0 - exp(-14 * delta))
+		_update_cat_motion(delta)
 		_step(delta)
 	elif state == Screen.TITLE:
 		expression = maxf(0, expression - delta)
@@ -862,7 +946,7 @@ func _button(label: String, action: String, primary: bool = false) -> void:
 	if not platform.allows_action(action):
 		return
 	var rect := ScreenLayout.button_rect(state, action)
-	var hover := rect.has_point(get_global_mouse_position())
+	var hover := rect.has_point(get_local_mouse_position())
 	var color := GOLD if primary else Color("65536b")
 	if hover:
 		color = MINT if primary else Color("89718a")
@@ -1061,7 +1145,7 @@ func _hud() -> void:
 	_text("%d CAUGHT" % catches, Vector2(398, 28), 8)
 	_button("II", "pause")
 	# Bottom prompt sits on the counter.
-	_text("MOUSE TO MUNCH", Vector2(12, 345), 8, INK)
+	_text("DRAG BELOW THE CAT" if touch_mode else "MOUSE TO MUNCH", Vector2(12, 345), 8, INK)
 	_text("%s / %s" % [CAT_NAMES[cat_name_index], cat_palettes[cat_palette].name], Vector2(320, 345), 8, INK, true)
 	_text("ESC: SNACK BREAK", Vector2(522, 345), 8, INK, true)
 
@@ -1095,7 +1179,7 @@ func _title() -> void:
 	_text("NO THOUGHTS. JUST CHICKEN.", Vector2(224, 173), 8, PINK, true)
 	# Cat portrait on a warm little stage.
 	var portrait := ScreenLayout.button_rect(state, "cat_shuffle")
-	var hovered := portrait.has_point(get_global_mouse_position())
+	var hovered := portrait.has_point(get_local_mouse_position())
 	draw_rect(portrait, Color("675367"))
 	draw_rect(Rect2(422, 81, 145, 132), MINT if hovered else Color("806678"), false, 2)
 	var frame := 1 if fmod(clock, 4) < 0.15 else 0
@@ -1125,7 +1209,7 @@ func _title() -> void:
 		draw_set_transform(position, title_snack.age * 2)
 		draw_texture_rect_region(nugget_tex, Rect2(-size / 2, -size / 2, size, size), _nugget_region(title_snack.kind, title_snack.variant))
 		draw_set_transform(Vector2.ZERO)
-	_text("MOVE YOUR MOUSE. CATCH THE NUGGETS.", Vector2(224, 205), 8, CREAM, true)
+	_text("MOUSE OR TOUCH. CATCH THE NUGGETS.", Vector2(224, 205), 8, CREAM, true)
 	_text("60 SECONDS. ONE VERY HUNGRY CAT.", Vector2(224, 221), 8, MINT, true)
 	_button("LET'S EAT!", "start", true)
 	_button("SETTINGS", "settings")

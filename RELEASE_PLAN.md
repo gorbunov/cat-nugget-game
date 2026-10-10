@@ -27,12 +27,13 @@ in [README](README.md); release status and commands are in [Deployment](DEPLOYME
 
 Firefox testing is deferred by the owner and is not a first-release blocker.
 
-## Later: tablet controls
+## Tablet controls: device validation and layout
 
-- [ ] Prototype drag controls with the mouth offset above the finger.
-- [ ] Keep the cat in place on release and ignore extra gameplay touches.
-- [ ] Adapt touch targets/instructions and landscape layouts, including 4:3 iPads
-  and safe areas; start with letterboxing.
+- [ ] Tune the implemented upward touch offset on the owner's iPad so the finger
+  leaves the cat visible and movement near the screen edges feels comfortable.
+- [ ] Validate the implemented proportional framing, patterned margins, safe areas
+  and portrait prompt on iPad and phone browsers; check bottom-margin dragging.
+- [ ] Tune touch-target sizes and instructions from device playtesting.
 - [ ] Playtest on the owner's iPad in the browser and on Android when available.
 
 ## Later: native iPad distribution

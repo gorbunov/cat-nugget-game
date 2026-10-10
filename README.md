@@ -26,8 +26,9 @@ Preserve this story, disclosure and credits when publishing the game.
 - Safari and Chrome passed owner browser playtesting; this does not establish
   itch.io embedded-play or Windows-device validation.
 - Version 0.11.5 is uploaded and processed on all three itch.io channels.
-- Developer ID signing and notarization automation are implemented. Apple's
-  first submission is still processing; see [deployment status](DEPLOYMENT.md#current-release-status).
+- The Mac release is Developer ID-signed, notarized and stapled; see
+  [deployment status](DEPLOYMENT.md#current-release-status).
+- Offset touch dragging is implemented in source; tablet playtesting is pending.
 
 ## Play
 
@@ -51,17 +52,29 @@ https://gorbunov.itch.io/nugget-cat; access depends on its dashboard visibility.
 | Control | Action |
 |---|---|
 | Mouse | Move the cat's mouth; catches and bites happen automatically |
+| Touch and drag | Move with the mouth above your finger; lift to leave the cat in place |
+| Tap | Activate on-screen buttons; drag volume sliders in Settings |
 | Enter / Space | Start or replay |
 | Escape | Pause/resume, close a panel; quit from the desktop title screen |
 | F11 / Option+Return | Desktop fullscreen (Fn+F11 on some keyboards) |
 | On-screen fullscreen control / Alt+Enter | Browser fullscreen, where supported |
 | Settings | Master, Music and Sounds volumes; soundtrack selection and fullscreen |
 
-The game pauses on focus loss or a fullscreen change during a round. Browser
+The game pauses on focus loss or a window/fullscreen resize during a round. Browser
 audio waits for user interaction; fullscreen requires a gesture and is never
 auto-restored. Browser F11 belongs to the browser. Browser/tablet title screens
 omit Quit. Native scores/preferences use Godot's `user://` directory; browser
 storage is local to the browser/origin and can be cleared by the player or browser.
+
+Touch uses one finger at a time with a 64-pixel upward mouth offset on the logical
+640 × 360 canvas. Movement is clamped to the playfield. Extra fingers are ignored
+during a drag; pausing or changing screens ends the gesture. A real mouse movement
+switches back to mouse control after the touch ends.
+
+The playfield fits proportionally inside the available safe area, with quiet plum
+pixel-patterned margins on wider or taller screens. The bottom margin also accepts
+gameplay drags, providing extra room below the cat. Portrait shows a rotate-to-landscape
+prompt; rotating back leaves an interrupted round paused until Resume is tapped.
 
 ### Game rules
 
@@ -115,6 +128,7 @@ work does not block the desktop/Web release; iPhone and Android are optional.
 | `scripts/nugget.gd` | Typed mutable flight/bite state |
 | `scripts/difficulty.gd` | Named pacing stages for throws, flight time and music rate |
 | `scripts/screen_layout.gd` | Screen enum, shared button geometry and hit testing |
+| `scripts/display_layout.gd` | Proportional playfield framing, safe areas, decorative margins and portrait prompt |
 | `scripts/platform_policy.gd` | Platform-specific Quit/fullscreen behavior |
 | `scripts/cat_appearance.gd` | Validated indexed palettes and cached recolored textures |
 | `scripts/room_background.gd` | Room selection and drawing |
@@ -125,7 +139,7 @@ work does not block the desktop/Web release; iPhone and Android are optional.
 | `tools/` | Asset preparation, previews, checks and release automation |
 | `release.json` / `itch.json` | Release/engine pins, signing configuration and upload destinations |
 
-The logical canvas is **640 × 360**, rendered with integer scaling and nearest
+The logical canvas is **640 × 360**, rendered with proportional scaling and nearest
 filtering. The desktop window starts at 1280 × 720. `_step(delta)` orders
 simulation phases; `_draw()` only renders. Route navigation through game helpers
 and keep inactive overlay-background controls out of hit testing. Input Map

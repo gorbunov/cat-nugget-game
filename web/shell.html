@@ -2,13 +2,14 @@
 <html lang="en">
 <head>
 	<meta charset="utf-8">
-	<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
 	<title>$GODOT_PROJECT_NAME</title>
 	<style>
 		:root { color-scheme: dark; font-family: ui-monospace, "Courier New", monospace; color: #fff0cd; background: #423044; }
 		* { box-sizing: border-box; }
 		html, body { margin: 0; width: 100%; height: 100%; overflow: hidden; touch-action: none; }
 		#canvas { display: block; outline: none; }
+		#safe-area { position: fixed; visibility: hidden; pointer-events: none; padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left); }
 		#loading { position: fixed; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; padding: 20px; text-align: center; background: #423044; }
 		#loading img { width: clamp(96px, 26vh, 192px); height: auto; image-rendering: pixelated; }
 		h1 { margin: 0; color: #ffc568; font-size: clamp(24px, 5vw, 40px); letter-spacing: 0.08em; }
@@ -26,6 +27,7 @@
 </head>
 <body>
 	<canvas id="canvas" tabindex="0" aria-label="Nugget Cat game">Your browser does not support the game canvas.</canvas>
+	<div id="safe-area" aria-hidden="true"></div>
 	<div id="loading">
 		<img src="$GODOT_SPLASH" width="192" height="192" alt="A happy ginger kitten">
 		<h1>NUGGET CAT</h1>
@@ -38,6 +40,14 @@
 	<script src="$GODOT_URL"></script>
 	<script>
 	(function () {
+		window.nuggetSafeInsets = function () {
+			const style = getComputedStyle(document.getElementById('safe-area'));
+			const rect = document.getElementById('canvas').getBoundingClientRect();
+			return [parseFloat(style.paddingTop) / Math.max(1, rect.height),
+				parseFloat(style.paddingRight) / Math.max(1, rect.width),
+				parseFloat(style.paddingBottom) / Math.max(1, rect.height),
+				parseFloat(style.paddingLeft) / Math.max(1, rect.width)];
+		};
 		const overlay = document.getElementById('loading');
 		const progress = document.getElementById('progress');
 		const fill = document.getElementById('fill');

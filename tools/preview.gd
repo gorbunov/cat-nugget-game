@@ -10,6 +10,11 @@ func _run() -> void:
 	game.test_mode = true
 	root.add_child(game)
 	game.clock = 1.0
+	DirAccess.make_dir_recursive_absolute("res://build/previews")
+	if "--layouts" in OS.get_cmdline_user_args():
+		await _preview_layouts(game)
+		quit()
+		return
 	await _capture(game, "title")
 	if "--title-snacks" in OS.get_cmdline_user_args():
 		game.title_snack_wait = 0
@@ -240,6 +245,35 @@ func _check_settings(game: Node2D) -> void:
 	game.audio.finale.stop()
 	await create_timer(0.1).timeout
 	print("SETTINGS CHECK PASSED: F11 fullscreen, Alt+Enter window restore, pause safety, %d audio previews, paused return, finale audio after track change." % game.TRACKS.size())
+
+func _preview_layouts(game: Node2D) -> void:
+	for item in [
+		["tablet", Vector2i(1024, 768)],
+		["phone_wide", Vector2i(852, 393)],
+		["portrait", Vector2i(393, 700)],
+		["desktop", Vector2i(1280, 720)],
+	]:
+		root.size = item[1]
+		await create_timer(0.3).timeout
+		game._change_screen(game.Screen.TITLE)
+		await _capture(game, "layout_" + item[0])
+		if not game.display_layout.portrait:
+			game._start_round()
+			game.touch_mode = true
+			game.cat = Vector2(320, 240)
+			game.cat_previous = game.cat
+			game.banner_time = 0
+			await _capture(game, "layout_" + item[0] + "_game")
+	# Rotation must pause a live round and returning to landscape must keep it paused.
+	game._start_round()
+	root.size = Vector2i(393, 700)
+	await create_timer(0.3).timeout
+	assert(game.display_layout.portrait and game.state == game.Screen.PAUSED)
+	root.size = Vector2i(1024, 768)
+	await create_timer(0.3).timeout
+	assert(not game.display_layout.portrait and game.state == game.Screen.PAUSED)
+	await _capture(game, "layout_rotation_paused")
+	print("LAYOUT PREVIEW: tablet, wide phone, portrait and desktop; rotation pauses until explicitly resumed.")
 
 func _capture(game: Node2D, label: String) -> void:
 	game.queue_redraw()

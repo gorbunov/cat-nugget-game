@@ -17,12 +17,134 @@ static func run(game: Game) -> void:
 	checks.append(_check_navigation)
 	checks.append(_check_rooms)
 	checks.append(_check_platform_controls)
+	checks.append(_check_touch_controls)
+	checks.append(_check_display_layout)
 	for check in checks:
 		if not check.call(game):
 			game.get_tree().quit(1)
 			return
 	print("SMOKE TEST PASSED: gameplay, pacing, music, 48 randomized rounds, palettes, cached textures, animation frames, manual selection, saved preferences and navigation.")
 	game.get_tree().quit(0)
+
+static func _touch(game: Game, index: int, position: Vector2, pressed: bool, canceled := false) -> void:
+	var event := InputEventScreenTouch.new()
+	event.index = index
+	event.position = game.get_global_transform_with_canvas() * position
+	event.pressed = pressed
+	event.canceled = canceled
+	game._input(event)
+
+static func _check_display_layout(game: Game) -> bool:
+	var layout := game.display_layout
+	for size in [Vector2(1280, 720), Vector2(1024, 768), Vector2(852, 393)]:
+		var safe := Rect2(Vector2.ZERO, size)
+		layout.configure(size, safe)
+		assert(safe.encloses(layout.play_rect))
+		assert(layout.play_rect.get_center().is_equal_approx(safe.get_center()))
+		assert(is_equal_approx(layout.play_rect.size.aspect(), 640.0 / 360))
+		assert(not layout.portrait)
+	var notched := Rect2(44, 0, 764, 372)
+	layout.configure(Vector2(852, 393), notched)
+	assert(notched.encloses(layout.play_rect))
+	assert(layout.play_rect.get_center().is_equal_approx(notched.get_center()))
+	layout.configure(Vector2(1024, 768), Rect2(0, 0, 1024, 768))
+	game._start_round()
+	_touch(game, 0, Vector2(320, 395), true)
+	game._update_cat_motion(1.0 / 60)
+	assert(game.touch_mode and game.cat.is_equal_approx(Vector2(320, 326)))
+	_touch(game, 0, Vector2(320, 395), false)
+	game._pause()
+	_touch(game, 0, Vector2(320, 395), true)
+	assert(game.active_touch == -1 and game.state == Game.Screen.PAUSED)
+	layout.configure(Vector2(393, 852), Rect2(0, 44, 393, 774))
+	assert(layout.portrait)
+	_touch(game, 0, Game.ScreenLayout.button_rect(Game.Screen.PAUSED, "resume").get_center(), true)
+	assert(game.state == Game.Screen.PAUSED)
+	var enter := InputEventKey.new()
+	enter.keycode = KEY_ENTER
+	enter.pressed = true
+	game._input(enter)
+	assert(game.state == Game.Screen.PAUSED)
+	game._update_display_layout()
+	print("LAYOUT CHECK: proportional fit, 4:3/wide margins, safe areas, bottom-margin dragging and portrait input blocking.")
+	return true
+
+
+static func _drag(game: Game, index: int, position: Vector2) -> void:
+	var event := InputEventScreenDrag.new()
+	event.index = index
+	event.position = game.get_global_transform_with_canvas() * position
+	game._input(event)
+
+
+static func _check_touch_controls(game: Game) -> bool:
+	assert(not ProjectSettings.get_setting("input_devices/pointing/emulate_mouse_from_touch"))
+	game._change_screen(Game.Screen.TITLE)
+	_touch(game, 0, Game.ScreenLayout.button_rect(Game.Screen.TITLE, "start").get_center(), true)
+	assert(game.state == Game.Screen.PLAYING and game.touch_mode)
+	assert(game.cat == Vector2(320, 180)) # Start tap must not move the cat.
+	_touch(game, 0, Vector2(320, 280), false)
+	_touch(game, 2, Vector2(250, 260), true)
+	game._update_cat_motion(1.0 / 60)
+	assert(game.cat.is_equal_approx(Vector2(250, 196)) and game.cat_previous == Vector2(320, 180), "Touch mapped to %s; transform %s" % [game.cat, game.transform])
+	_drag(game, 2, Vector2(400, 300))
+	game._update_cat_motion(1.0 / 60)
+	assert(game.cat.is_equal_approx(Vector2(400, 236)) and game.cat_previous.is_equal_approx(Vector2(250, 196)))
+	# A second finger cannot move the cat, release the first finger or hit Pause.
+	_touch(game, 7, Game.ScreenLayout.button_rect(Game.Screen.PLAYING, "pause").get_center(), true)
+	_drag(game, 7, Vector2(100, 100))
+	_touch(game, 7, Vector2(100, 100), false)
+	game._update_cat_motion(1.0 / 60)
+	assert(game.cat.is_equal_approx(Vector2(400, 236)) and game.active_touch == 2 and game.state == Game.Screen.PLAYING)
+	_touch(game, 2, Vector2(400, 300), false)
+	var synthetic := InputEventMouseMotion.new()
+	synthetic.device = InputEvent.DEVICE_ID_EMULATION
+	synthetic.relative = Vector2(10, 10)
+	game._input(synthetic)
+	game._update_cat_motion(1.0 / 60)
+	assert(game.cat.is_equal_approx(Vector2(400, 236)) and game.cat_previous == game.cat and game.touch_mode)
+	_touch(game, 1, Vector2(100, 150), true)
+	_drag(game, 1, Vector2(-100, -100))
+	game._update_cat_motion(1.0 / 60)
+	assert(game.cat == Game.CAT_MIN)
+	_drag(game, 1, Vector2(800, 500))
+	game._update_cat_motion(1.0 / 60)
+	assert(game.cat == Game.CAT_MAX)
+	_touch(game, 1, Vector2(800, 500), false, true)
+	_drag(game, 1, Vector2(300, 200))
+	game._update_cat_motion(1.0 / 60)
+	assert(game.cat == Game.CAT_MAX and game.active_touch == -1)
+	# Focus loss ends dragging; resuming preserves the mouth and requires a fresh touch.
+	_touch(game, 3, Vector2(300, 250), true)
+	game._update_cat_motion(1.0 / 60)
+	game._notification(MainLoop.NOTIFICATION_APPLICATION_FOCUS_OUT)
+	assert(game.state == Game.Screen.PAUSED and game.active_touch == -1)
+	_touch(game, 4, Game.ScreenLayout.button_rect(Game.Screen.PAUSED, "resume").get_center(), true)
+	_drag(game, 3, Vector2(100, 100))
+	game._update_cat_motion(1.0 / 60)
+	assert(game.state == Game.Screen.PLAYING and game.cat.is_equal_approx(Vector2(300, 186)))
+	_touch(game, 4, Vector2.ZERO, false)
+	_touch(game, 0, Game.ScreenLayout.button_rect(Game.Screen.PLAYING, "pause").get_center(), true)
+	assert(game.state == Game.Screen.PAUSED)
+	game._handle_action("settings")
+	var slider := game._volume_slider_rect(0)
+	_touch(game, 0, slider.get_center(), true)
+	assert(is_equal_approx(game.master_volume, 0.5))
+	_drag(game, 0, slider.end)
+	assert(is_equal_approx(game.master_volume, 1.0))
+	_touch(game, 0, slider.end, false)
+	assert(game.volume_drag == -1)
+	_touch(game, 0, Game.ScreenLayout.button_rect(Game.Screen.SETTINGS, "back").get_center(), true)
+	assert(game.state == Game.Screen.PAUSED)
+	game._resume()
+	var mouse := InputEventMouseMotion.new()
+	mouse.relative = Vector2(1, 0)
+	game._input(mouse)
+	game._update_cat_motion(1.0 / 60)
+	assert(not game.touch_mode and game.cat == game.get_local_mouse_position().clamp(Game.CAT_MIN, Game.CAT_MAX))
+	print("TOUCH CHECK: offset drag, swept movement, release/cancel, edge clamps, extra fingers, focus loss, menu taps, sliders and mouse handoff.")
+	return true
+
 
 static func _check_platform_controls(game: Game) -> bool:
 	var original := game.platform
