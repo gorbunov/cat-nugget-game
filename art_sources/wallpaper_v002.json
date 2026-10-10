@@ -1,0 +1,27 @@
+{
+  "request": {
+    "model": "gpt-image-2.5-flare",
+    "prompt": "Create a seamless, repeatable square wallpaper texture for the decorative margins of a cozy pixel-art cat arcade game. This is a production game texture, not a mockup, not a screenshot. Fill the entire image edge to edge with the repeating pattern, no border, no frame, no lettering, no central subject, no vignette, no lighting gradient.\n\nArt direction: cozy cafe table linen for a playful chicken-nugget-catching cat game. A very subdued small gingham weave, softened with a few tiny embroidered snack-and-paw doodles: irregular rounded chicken nugget outlines, simple four-toed cat paw prints, occasional pairs of crumbs and tiny four-point sparkles. Use ONLY about twelve widely spaced tiny motifs across the entire tile, each around 8 to 12 pixels wide on the imagined 256-pixel grid. At least 85 percent of the surface should read as quiet cloth and empty space. Arrange motifs casually, not in alternating rows of identical icons. No flowers, leaves, vines, botanical elements, damask, hearts, faces, text, plates, cutlery, or large food illustrations. This is understated cafe fabric, not a busy novelty print. The pattern must be attractive in a narrow horizontal strip or a narrow vertical strip as well as over a whole screen.\n\nPalette: deep muted aubergine/plum ground close to #302735, barely visible woven checks around #38303f and #403443. Small embroidered paw motifs in dusty mauve around #65505a, occasional nugget outlines or crumbs in muted antique gold around #8b705a. The weave is much lower contrast than the sparse motifs. Keep the whole texture dark and low contrast; it surrounds brightly lit pastel game rooms and must recede behind them. No white or bright highlights, no neon, no black outlines, no distracting high-frequency noise.\n\nTrue crisp pixel-art treatment, as if designed on a 256 by 256 pixel tile and enlarged exactly four times with nearest-neighbor sampling. Controlled pixel clusters, restrained palette, clean stepped curves, no antialiasing or blur. A whisper of woven-cotton character created with orderly pixel clusters, not random grain or photographic threads. Perfectly seamless opposite edges. Flat orthographic texture only.\n",
+    "n": 1,
+    "size": "1024x1024",
+    "quality": "medium",
+    "background": "opaque",
+    "output_format": "png"
+  },
+  "request_id": "req_f2fba28178634ab8b9d1bde21c4c28e6",
+  "created": 1791646902,
+  "usage": {
+    "input_tokens": 461,
+    "input_tokens_details": {
+      "image_tokens": 0,
+      "text_tokens": 461
+    },
+    "output_tokens": 439,
+    "output_tokens_details": {
+      "image_tokens": 439,
+      "text_tokens": 0
+    },
+    "total_tokens": 900
+  },
+  "revised_prompt": null
+}

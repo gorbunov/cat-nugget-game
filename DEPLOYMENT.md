@@ -135,7 +135,61 @@ fullscreen enabled, without SharedArrayBuffer or mobile-friendly flags.
 Page visibility and content are managed in the dashboard. Include the project
 story, controls, AI disclosure and all three CC0 sound links from README.
 
-### Compact presentation reference
+## Cloudflare custom-domain Web deployment
+
+**https://cat-nugget.gorbunov.dev** was deployed on **2026-10-10** to Worker
+`nugget-cat`, version `0baa228c-e043-4ff1-a17c-d8a4982d7e90` (game 0.11.5).
+The build, packaging and local HTTP checks passed. Cloudflare public DNS resolves
+the hostname; HTTPS returned 200 and the live WASM decoded to the expected
+39,514,754-byte engine. Initial verification used the published Cloudflare IP
+because the local resolver had not yet picked up the new DNS record.
+Device/browser playtesting of the published hostname remains pending.
+
+From the repository root (Node.js 22+ and the pinned Godot are required):
+
+```sh
+npm --prefix tools/cloudflare ci
+npm --prefix tools/cloudflare run whoami
+# If not already authenticated:
+npm --prefix tools/cloudflare run login
+
+# Full build/tests, package and Wrangler validation without uploading:
+npm --prefix tools/cloudflare run check
+python3 tools/test_cloudflare.py --serve-check
+
+# Full build/tests, then publish and attach the custom domain:
+npm --prefix tools/cloudflare run deploy
+```
+
+`tools/cloudflare/wrangler.jsonc` owns the Worker name and custom hostname.
+The `gorbunov.dev` zone must be active in the authenticated Cloudflare account.
+Wrangler's custom-domain deployment provisions the DNS association and HTTPS
+certificate; an existing conflicting record at that hostname must be resolved
+in Cloudflare. `workers.dev` and version-preview URLs are disabled.
+Credentials stay in Wrangler's own store; CI can use `CLOUDFLARE_API_TOKEN` and
+`CLOUDFLARE_ACCOUNT_ID` environment variables.
+
+Wrangler's custom build runs `tools/prepare_cloudflare.py`, which invokes the
+existing Web build/check pipeline into `build/cloudflare/build/`, then prepares
+`build/cloudflare/assets/`. The regular `build/web` and itch.io outputs are separate.
+The engine WASM is about 38 MiB uncompressed, exceeding Cloudflare's 25 MiB
+per-asset limit. Packaging reduces it to about 9.6 MiB with deterministic gzip.
+A small Worker serves that file at `/index.wasm` with `application/wasm`,
+`Content-Encoding: gzip` and manual body encoding to avoid double compression.
+All other files use Workers Static Assets directly. The browser receives the
+original WASM bytes after HTTP decoding; the Godot loader needs no modifications.
+
+Assets revalidate on reload so updates do not remain stuck in browser cache.
+Local validation checks decoded WASM bytes against the export, PCK bytes,
+response headers, HEAD requests and missing-file 404s. Run
+`python3 tools/test_cloudflare.py` for packaging-only checks, and
+`python3 tools/test_release.py` for existing release-tool gates.
+
+`npm --prefix tools/cloudflare run dev` builds and serves through local Wrangler.
+For device testing, use the published HTTPS hostname once deployed. Scores and
+settings are browser-origin-specific, so this hostname has its own save storage.
+
+## itch.io presentation reference
 
 Recorded palette/design choices (live dashboard values have not been audited):
 

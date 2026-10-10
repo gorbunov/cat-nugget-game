@@ -13,6 +13,7 @@ import sys
 import subprocess
 import urllib.error
 import urllib.request
+import uuid
 
 ROOT = Path(__file__).resolve().parents[1]
 KEYCHAIN_SERVICE = 'CatNuggetGame.OpenAI'
@@ -39,7 +40,8 @@ def read_api_key():
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--model', default='gpt-image-2.5-flare')
-    parser.add_argument('--asset', choices=['hands', 'cat', 'cat_dance', 'nuggets', 'rooms'], default='hands')
+    parser.add_argument('--asset', choices=['hands', 'cat', 'cat_dance', 'cat_disgust', 'nuggets', 'rooms', 'wallpaper'], default='hands')
+    parser.add_argument('--reference', type=Path, help='Existing PNG inside the project to use as an Image API edit reference')
     parser.add_argument('--name', default=None)
     parser.add_argument('--quality', choices=['low', 'medium', 'high'], default='medium')
     parser.add_argument('--room', choices=['kitchen', 'cafe', 'sunroom', 'study'], help='Generate one detailed room rather than a four-room sheet')
@@ -62,13 +64,32 @@ def main():
     prompt = (ROOT / 'tools' / 'prompts' / (args.asset + '.txt')).read_text()
     if args.room:
         prompt = (ROOT / 'tools' / 'prompts' / 'rooms_hd.txt').read_text() + '\n\n' + (ROOT / 'tools' / 'prompts' / ('room_' + args.room + '.txt')).read_text()
-    background = 'opaque' if args.asset == 'rooms' else 'transparent'
-    payload = dict(model=args.model, prompt=prompt, n=1, size='1536x1024',
+    background = 'opaque' if args.asset in ('rooms', 'wallpaper') else 'transparent'
+    size = '1024x1024' if args.asset == 'wallpaper' else '1536x1024'
+    payload = dict(model=args.model, prompt=prompt, n=1, size=size,
                    quality=args.quality, background=background, output_format='png')
+    endpoint = 'generations'
+    content_type = 'application/json'
+    body = json.dumps(payload).encode()
+    reference = None
+    if args.reference:
+        reference = args.reference.resolve()
+        if not reference.is_relative_to(ROOT) or not reference.is_file() or reference.suffix.lower() != '.png':
+            parser.error('--reference must be an existing PNG inside the project')
+        endpoint = 'edits'
+        boundary = 'NuggetCat' + uuid.uuid4().hex
+        parts = []
+        for field, value in payload.items():
+            parts.append(f'--{boundary}\r\nContent-Disposition: form-data; name="{field}"\r\n\r\n{value}\r\n'.encode())
+        parts.append(f'--{boundary}\r\nContent-Disposition: form-data; name="image"; filename="reference.png"\r\nContent-Type: image/png\r\n\r\n'.encode())
+        parts.append(reference.read_bytes())
+        parts.append(f'\r\n--{boundary}--\r\n'.encode())
+        body = b''.join(parts)
+        content_type = 'multipart/form-data; boundary=' + boundary
     request = urllib.request.Request(
-        'https://api.openai.com/v1/images/generations',
-        data=json.dumps(payload).encode(),
-        headers={'Authorization': 'Bearer ' + key, 'Content-Type': 'application/json'},
+        'https://api.openai.com/v1/images/' + endpoint,
+        data=body,
+        headers={'Authorization': 'Bearer ' + key, 'Content-Type': content_type},
         method='POST',
     )
     print(f'Requesting one {background} {args.asset} sheet with {args.model}...', flush=True)
@@ -86,6 +107,7 @@ def main():
         sys.exit('Response was not a PNG; no image saved.')
     destination.write_bytes(image)
     metadata = {'request': payload, 'request_id': request_id,
+                'endpoint': endpoint, 'reference': str(reference.relative_to(ROOT)) if reference else None,
                 'created': result.get('created'), 'usage': result.get('usage'),
                 'revised_prompt': result['data'][0].get('revised_prompt')}
     destination.with_suffix('.json').write_text(json.dumps(metadata, indent=2) + '\n')

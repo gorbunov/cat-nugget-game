@@ -10,12 +10,13 @@ on ideas, and follow through to a playable result. Making it together is as
 important as the game itself.
 
 **AI disclosure:** The game uses AI-generated images and music. Character, hand,
-nugget and room artwork is processed into game-ready sprites; music uses
+nugget and room artwork is processed into game-ready assets; music uses
 AI-assisted composition and synthesis scripts. Crowd reactions and gulp sounds
 are separate CC0 recordings, credited below and in the in-game Sources panel.
 Preserve this story, disclosure and credits when publishing the game.
 
 - [Deployment](DEPLOYMENT.md): build, signing, notarization, itch.io uploads and current release status.
+- [Cloudflare deployment](DEPLOYMENT.md#cloudflare-custom-domain-web-deployment): Wrangler build/deploy workflow for `cat-nugget.gorbunov.dev`.
 - [Planned work](RELEASE_PLAN.md): outstanding validation and future milestones only.
 - [Repository guidance](AGENTS.md): implementation conventions and verification rules.
 
@@ -71,8 +72,12 @@ Touch uses one finger at a time with a 64-pixel upward mouth offset on the logic
 during a drag; pausing or changing screens ends the gesture. A real mouse movement
 switches back to mouse control after the touch ends.
 
-The playfield fits proportionally inside the available safe area, with quiet plum
-pixel-patterned margins on wider or taller screens. The bottom margin also accepts
+The playfield fits proportionally inside the available safe area, with solid
+plum margins and a shaded warm frame on wider or taller screens. Low-contrast
+pixel paws and sparkles, larger at the sides, form a loose arrangement with fine
+corner decorations rather than a repeating pattern. Menu panels and the score
+bar use plain backgrounds for readability.
+The bottom margin also accepts
 gameplay drags, providing extra room below the cat. Portrait shows a rotate-to-landscape
 prompt; rotating back leaves an interrupted round paused until Resume is tapped.
 
@@ -86,7 +91,7 @@ combo and golden bonus; letting burnt food fly away has no penalty.
 |---|---:|---|---|
 | Regular | 10 | One chomp | 70% per ordinary throw |
 | Big regular | 30 | Three chomps | 15% per ordinary throw |
-| Burnt | — | Costs up to 30 points and resets combo/golden bonus | 11% per ordinary throw |
+| Burnt | — | Costs up to 30 points, resets combo/golden bonus, and blocks edible bites for 2 seconds | 11% per ordinary throw |
 | Golden | 20 | Adds a multiplier tier, capped at ×5 | 4% per ordinary throw |
 | Big golden | 100 | Three chomps, then collects all edible flying nuggets | 18% chance per round |
 
@@ -101,6 +106,11 @@ nugget: track visible food to take 40 bites. Biting accelerates from 3 to 8 chom
 per second over three seconds of contact; brief slips preserve speed, longer gaps
 cool it down. Finishing awards 500 points and a three-second belly dance; otherwise
 the boss escapes and the earlier score remains.
+
+A burnt bite triggers a two-second edible-bite lockout with an eight-pose
+AI-generated reaction: wincing, gagging, spitting tiny droplets/crumbs, and
+grimacing. It plays twice at eight frames per second, supports every cat palette,
+freezes on pause, and restarts if another burnt nugget is eaten.
 
 Each round chooses a cat name, one of seven palettes, and one of four rooms, with
 no immediate color/room repeats. Clicking the title-screen portrait changes the
@@ -175,13 +185,14 @@ Visual checks require a graphical session, **not** `--headless`:
 ```
 
 Screenshots are regenerated into `build/previews/`. Other flags include `--hands`,
-`--cat-colors`, `--dance`, `--sources` and `--check-title-fullscreen`. User flags go
+`--cat-colors`, `--dance`, `--disgust`, `--sources`, `--layouts` and `--check-title-fullscreen`. User flags go
 after `--`. Preview screenshots and editor/Python caches are disposable; retained
 release archives, receipts and notarization logs are not temporary scratch files.
 
 ### Game assets
 
-`assets/cat_indexed.png` and `assets/cat_dance_indexed.png` are data: red bytes
+`assets/cat_indexed.png`, `assets/cat_dance_indexed.png` and
+`assets/cat_disgust_indexed.png` are data: red bytes
 encode palette-role IDs. Edit colors in `assets/cat_palettes.json`; geometry,
 roles and anchors live in the corresponding sprite JSON files. Keep role IDs
 stable, imports lossless, mipmaps disabled and `process/fix_alpha_border=false`.
@@ -194,9 +205,11 @@ Offline converters preserve the active source selection:
 | `prepare_hands.gd` | Three-frame hand atlas from `hands_v001.png` |
 | `prepare_cat.gd` | Indexed cat atlas, palette preview and icon from `cat_v001.png` |
 | `prepare_cat_dance.gd` | Indexed dance atlas from `cat_dance_v001.png` |
+| `prepare_cat_disgust.gd` | Eight aligned, palette-indexed burnt-reaction poses from `cat_disgust_v001.png` |
 | `prepare_nuggets.gd` | Six-frame nugget atlas from `nuggets_v001.png` |
 | `prepare_nugget_bites.gd` | Bite overlays from the active nugget atlas |
 | `prepare_rooms.gd` | Four 640 × 360 rooms from `room_*_v002.png` |
+| `prepare_wallpaper.gd` | Retained wallpaper experiment from `wallpaper_v002.png`; not used by the current frame |
 | `prepare_boot_splash.gd` | Shared native/Web startup artwork |
 | `generate_reactions.py` | CC0 recordings converted to WAV using macOS `afconvert` |
 
@@ -217,6 +230,12 @@ python3 tools/generate_ai_art.py --check-key
 Credentials resolve from `OPENAI_API_KEY`, then macOS Keychain service
 `CatNuggetGame.OpenAI`. Setup uses a hidden prompt and verifies Keychain read-back;
 the availability check makes no API request and never displays the key.
+
+For matching-character companion sheets, `generate_ai_art.py` accepts
+`--reference art_sources/cat_v001.png` and uses the Image API edit endpoint.
+For example, `--asset cat_disgust --name cat_disgust_v002 --reference art_sources/cat_v001.png`
+creates a new candidate without activating it. The retained metadata records the
+reference path and prompt; the converter selects the active source explicitly.
 
 New artwork makes one billed request with no automatic retries. Use a fresh name:
 

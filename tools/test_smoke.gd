@@ -325,7 +325,7 @@ static func _check_round_choices(game: Game) -> bool:
 
 
 static func _check_palettes(game: Game) -> bool:
-	for art in [game.cat_art, game.dance_art]:
+	for art in [game.cat_art, game.dance_art, game.disgust_art]:
 		var role_examples := {}
 		for pixel in range(art.indices.size()):
 			role_examples[art.indices[pixel]] = Vector2i(pixel % art.image_size.x, pixel / art.image_size.x)

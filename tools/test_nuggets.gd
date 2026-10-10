@@ -20,6 +20,9 @@ func _run() -> void:
 	if not _check_bite_art(game):
 		quit(1)
 		return
+	if not _check_burnt_cooldown(game):
+		quit(1)
+		return
 	_reset(game)
 	var big = game._make_nugget("big", game.cat, Vector2.ZERO, 0)
 	game.nuggets.append(big)
@@ -113,6 +116,57 @@ func _run() -> void:
 	_check_boss(game)
 	quit()
 
+func _check_burnt_cooldown(game: Node2D) -> bool:
+	_reset(game)
+	for kind in ["regular", "big", "golden", "big_golden"]:
+		game.nuggets.append(game._make_nugget(kind, game.cat, Vector2.ZERO, 0))
+	# Burnt is visited first, so even later collisions in this pass are blocked.
+	game.nuggets.append(game._make_nugget("burnt", game.cat, Vector2.ZERO, 0))
+	game._step(1.0 / 60)
+	assert(game.disgust == 2.0 and game.nuggets.size() == 4 and game.catches == 0)
+	game._pause()
+	var paused_frame: int = game._disgust_frame()
+	game._step(3)
+	assert(game.disgust == 2.0 and game._cat_frame() == 5)
+	assert(game._disgust_frame() == paused_frame)
+	game.touch_mode = true
+	game._resume()
+	game._miss() # Miss feedback must not shorten the burnt reaction.
+	var reaction_frames := {}
+	for i in range(119):
+		game._step(1.0 / 60)
+		assert(game.catches == 0 and game._cat_frame() == 5)
+		reaction_frames[game._disgust_frame()] = true
+		for nugget in game.nuggets:
+			assert(nugget.hp == game.NUGGET_TYPES[nugget.kind].hp)
+	assert(reaction_frames.size() == 8)
+	game._step(0.02)
+	assert(game.disgust == 0 and game.catches == 2 and game._cat_frame() != 5)
+	# An earned collection wave waits rather than eating through the cooldown.
+	_reset(game)
+	game.nuggets.append(game._make_nugget("regular", Vector2(100, 100), Vector2.ZERO, 0))
+	game._eat_nugget(game._make_nugget("big_golden", game.cat))
+	game._eat_nugget(game._make_nugget("burnt", game.cat))
+	game._collect_flying_nuggets()
+	assert(game.sweep_pending and game.nuggets.size() == 1 and game.catches == 1)
+	game._step(2.01)
+	assert(not game.sweep_pending and game.nuggets.is_empty() and game.catches == 2)
+	# The reaction survives the boss transition, then biting recovers normally.
+	_reset(game)
+	game._eat_nugget(game._make_nugget("burnt", game.cat))
+	game.remaining = game.BOSS_DURATION
+	game._start_boss()
+	for i in range(90):
+		game.cat_previous = game._boss_position(game.boss_age)
+		game.cat = game._boss_position(game.boss_age + 1.0 / 60)
+		game._step(1.0 / 60)
+		assert(game.boss_hp == game.BOSS_BITES and game._cat_frame() == 5)
+	game._start_round()
+	assert(game.disgust == 0)
+	game.touch_mode = false
+	print("BURNT CHECK: two-second bite lockout, disgust pose, pause, multi-bite food, delayed sweep, boss transition and replay reset.")
+	return true
+
 func _check_boss(game: Node2D) -> void:
 	_reset(game)
 	game.remaining = game.BOSS_DURATION + 0.01
@@ -132,12 +186,26 @@ func _check_boss(game: Node2D) -> void:
 		game._start_boss()
 		var dt: float = 1.0 / fps
 		var duration := 0.0
+		game.streak = 20 if fps == 60 else 0 # A high combo must not pin the wild pose.
+		var last_frame := -1
+		var chomp_transitions := 0
+		var held_frames := 0
 		while not game.boss_defeated and duration < 9:
 			game.cat_previous = game._boss_position(game.boss_age)
 			game.cat = game._boss_position(game.boss_age + dt)
 			game._step(dt)
 			duration += dt
+			if duration >= 3 and not game.boss_defeated:
+				var frame: int = game._cat_frame()
+				assert(frame in [2, 3])
+				if frame != last_frame:
+					chomp_transitions += 1
+					held_frames = 0
+				last_frame = frame
+				held_frames += 1
+				assert(held_frames <= ceili(fps / 16.0) + 1)
 		assert(game.boss_defeated and game.boss_hp == 0 and game.score == 500)
+		assert(chomp_transitions >= 40) # Both mouth poses continue cycling at peak speed.
 		assert(absf(duration - 5.9375) < 0.05)
 		var frozen: float = game.remaining
 		game._pause()
@@ -165,7 +233,7 @@ func _check_boss(game: Node2D) -> void:
 	assert(not game.boss_defeated and game.boss_hp == 40 and game.round_phase == game.RoundPhase.CATCHING)
 	_check_boss_wind_down(game)
 	_check_boss_silhouette(game)
-	print("BOSS CHECK: clean transition, timeout, 30/60/144 FPS bite ramp, single bonus, pause, celebration, cooling and replay.")
+	print("BOSS CHECK: clean transition, timeout, 30/60/144 FPS bite ramp and sustained chomp animation, single bonus, pause, celebration, cooling and replay.")
 
 func _check_boss_wind_down(game: Node2D) -> void:
 	_reset(game)

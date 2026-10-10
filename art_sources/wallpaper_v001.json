@@ -1,0 +1,27 @@
+{
+  "request": {
+    "model": "gpt-image-2.5-flare",
+    "prompt": "Create a seamless, repeatable square wallpaper texture for the decorative margins of a cozy pixel-art cat arcade game. This is a production game texture, not a mockup, not a screenshot. Fill the entire image edge to edge with the repeating pattern, no border, no frame, no lettering, no central subject, no vignette, no lighting gradient.\n\nArt direction: a lovingly illustrated vintage storybook wallpaper for a tiny warm cafe, with an elegant small-scale botanical damask rhythm. Gently curving stems, little leaves, occasional very small four-toed cat paw silhouettes, and tiny diamond flecks. Shapes should feel hand-designed, organic and charming rather than a rigid grid of icons. Broad negative spaces between the delicate motifs. The pattern must be attractive in a narrow horizontal strip or a narrow vertical strip as well as over a whole screen.\n\nPalette: deep muted aubergine/plum ground close to #302735, softly contrasting dusty mauve ornament close to #514050 and #65505a, with extremely sparse muted warm antique-gold details close to #8b705a. Keep the whole texture dark and low contrast; it surrounds brightly lit pastel game rooms and must recede behind them. No white or bright highlights, no neon, no large recognizable cats or food, no distracting high-frequency noise.\n\nTrue crisp pixel-art treatment, as if designed on a 256 by 256 pixel tile and enlarged exactly four times with nearest-neighbor sampling. Controlled pixel clusters, restrained palette, clean stepped curves, no antialiasing or blur. A whisper of woven-paper character created with sparse orderly pixels, not random grain. Perfectly seamless opposite edges. Flat orthographic texture only.\n",
+    "n": 1,
+    "size": "1024x1024",
+    "quality": "medium",
+    "background": "opaque",
+    "output_format": "png"
+  },
+  "request_id": "req_358a4352d29544afb108ced1e731a8fa",
+  "created": 1791646461,
+  "usage": {
+    "input_tokens": 347,
+    "input_tokens_details": {
+      "image_tokens": 0,
+      "text_tokens": 347
+    },
+    "output_tokens": 439,
+    "output_tokens_details": {
+      "image_tokens": 439,
+      "text_tokens": 0
+    },
+    "total_tokens": 786
+  },
+  "revised_prompt": null
+}

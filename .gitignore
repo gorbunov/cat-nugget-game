@@ -3,6 +3,10 @@
 
 # Exported apps, archives, downloaded templates, and test previews.
 /build/
+node_modules/
+.wrangler/
+.dev.vars
+.dev.vars.*
 
 # Local export credentials (export_presets.cfg stays tracked).
 /export_credentials.cfg

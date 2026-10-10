@@ -1,0 +1,17 @@
+Use the attached existing eight-frame kitten sprite sheet as the EXACT character and pixel-art style reference. Produce a new companion eight-frame disgust/recovery animation sheet for this SAME kitten after it accidentally eats a burnt chicken nugget. Preserve the reference cat's silhouette, head/body ratio, seated pose, tail, whiskers, fur markings, colors, and consistent scale. Do not redesign the character. This is a comic, cute, non-graphic reaction suitable for a parent-and-child arcade game.
+
+Transparent PNG, exactly 1536x1024 pixels. EXACTLY EIGHT sprites in a regular FOUR-COLUMN by TWO-ROW invisible grid: cells 384x512. Each whole seated kitten is centered in its cell, around 300 pixels wide by 330 pixels high, with all ears, tail, feet and spit effects fully inside its cell and generous transparent gutters. Keep the nose/mouth anchor near (192, 288) relative to EVERY cell. Keep feet baseline and head positions stable so frames animate smoothly. All cats face the viewer. No floor, shadows, backgrounds, grid lines, labels, text, or additional sprites.
+
+Eight sequential frames, reading left to right across top then bottom:
+0: WINCE. Eyes tightly squeezed, eyebrows pinched, little downturned grimacing mouth, cheeks tensed.
+1: GAG. Eyes squeezed asymmetrically, cheeks puffed, lips pursed and clearly disgusted.
+2: SPIT START. Eyes squeezed, mouth opens to one side, tongue out and one tiny pale-mint droplet just outside the mouth.
+3: SPIT. Three small pale-mint droplets and two little dark burnt crumbs arc outward to the viewer's right. Funny forceful "ptooey" pose, no words.
+4: SPEW. A short cartoon spray of tiny pale-mint droplets and dark crumbs down-right from the mouth. Tongue sticking out, eyes pinched. The spray extends only about a quarter of the cat's head width; NOT a long stream, NOT graphic vomit or slime.
+5: AFTER-SPIT. One or two droplets further from the mouth, tongue still out, eyes squeezed; keep body planted.
+6: GRIMACE. Crooked scrunched-up mouth, narrowed eyes, one cheek wrinkled, no more droplets.
+7: RECOVERING WINCE. Small pout, one eye cautiously half-open, still visibly unimpressed; seamlessly compatible with frame 0 when repeated.
+
+Role colors must match reference for palette swapping: COOL NEUTRAL SLATE-GRAY fur (#596375, #909CAC, #BCC5D1); WARM CREAM belly and muzzle (#F3DCAB, #D5B885); dark plum-black outlines/mouth/crumbs (#302736); TURQUOISE eyes and spit (#55CDBA, #A5EEE0); rose PINK nose/ears/tongue (#E889A6, #BD647E); pure WHITE highlights and tiny teeth. No extra colors. Spit should be tiny clean mint pixel droplets, not skin-colored or brown liquid.
+
+True chunky low-resolution 64x64 pixel-art design enlarged with nearest-neighbor square pixels, controlled clusters, dark stepped outlines, flat cel shading. No antialiasing, blur, smooth gradients or fine noise. The expression changes must be readable when the cat is displayed very small. Keep the kitten appealing and recognizable in every frame.

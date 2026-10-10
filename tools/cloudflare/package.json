@@ -1,0 +1,14 @@
+{
+  "name": "nugget-cat-cloudflare",
+  "private": true,
+  "scripts": {
+    "login": "wrangler login",
+    "whoami": "wrangler whoami",
+    "check": "wrangler deploy --dry-run",
+    "deploy": "wrangler deploy",
+    "dev": "wrangler dev"
+  },
+  "devDependencies": {
+    "wrangler": "4.149.0"
+  }
+}

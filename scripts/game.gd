@@ -10,6 +10,7 @@ const CAT_MIN := Vector2(20, 62)
 const CAT_MAX := Vector2(620, 326)
 const TOUCH_MOUTH_OFFSET := Vector2(0, -64)
 const CHOMP_INTERVAL := 0.20
+const BURNT_COOLDOWN := 2.0
 const BOSS_BITES := 40
 const BOSS_BONUS := 500
 const BOSS_SIZE := 96.0
@@ -79,6 +80,8 @@ var browser_audio_started := false
 # Assets and appearance (the chosen cat persists through pause and results).
 var cat_art := CatAppearance.new()
 var dance_art := CatAppearance.new()
+var disgust_art := CatAppearance.new()
+var disgust_tex: Texture2D
 var dance_tex: Texture2D
 var boss_masks: Array[BitMap] = []
 var room := RoomBackground.new()
@@ -112,6 +115,7 @@ var touch_target := cat
 var tilt := 0.0
 var expression := 0.0
 var offended := 0.0
+var disgust := 0.0
 var banner := ""
 var banner_time := 0.0
 var particles: Array[Dictionary] = []
@@ -184,6 +188,9 @@ func _ready() -> void:
 	if dance_art.load_assets(null, "res://assets/cat_dance_sprite.json") != OK:
 		get_tree().quit(1)
 		return
+	if disgust_art.load_assets(null, "res://assets/cat_disgust_sprite.json") != OK:
+		get_tree().quit(1)
+		return
 	for stage in range(1, 4):
 		var texture := nugget_tex if stage == 3 else nugget_bite_tex
 		var mask := BitMap.new()
@@ -217,6 +224,7 @@ func _select_cat(index: int) -> void:
 	cat_palette = index
 	cat_tex = cat_art.texture_for_palette(index)
 	dance_tex = dance_art.texture_for_palette(index)
+	disgust_tex = disgust_art.texture_for_palette(index)
 	cat_name_index = _random_choice(cat_name_index, CAT_NAMES.size())
 
 func _select_track(index: int) -> void:
@@ -548,6 +556,7 @@ func _start_round() -> void:
 	spawn_in = 0.25
 	expression = 0
 	offended = 0
+	disgust = 0
 	nuggets.clear()
 	hands.clear()
 	particles.clear()
@@ -651,6 +660,7 @@ func _step_catching(delta: float) -> void:
 func _update_round_feedback(delta: float) -> void:
 	expression = maxf(0, expression - delta)
 	offended = maxf(0, offended - delta)
+	disgust = maxf(0, disgust - delta)
 	banner_time = maxf(0, banner_time - delta)
 	sweep_time = maxf(0, sweep_time - delta)
 	if round_phase == RoundPhase.CATCHING and remaining <= BOSS_DURATION + BOSS_WARNING:
@@ -695,7 +705,7 @@ func _update_nuggets(delta: float) -> void:
 		nugget.pos += nugget.vel * delta
 		nugget.rotation += nugget.spin * delta
 		# Swept relative motion prevents tunneling during fast mouse swipes.
-		if _swept_catch(previous_position, nugget.pos, cat_previous, cat, NUGGET_TYPES[nugget.kind].radius):
+		if (disgust <= 0 or nugget.kind == "burnt") and _swept_catch(previous_position, nugget.pos, cat_previous, cat, NUGGET_TYPES[nugget.kind].radius):
 			if _chomp(nugget):
 				nuggets.remove_at(i)
 				_eat_nugget(nugget)
@@ -762,7 +772,7 @@ func _step_boss(delta: float) -> void:
 		boss_age += dt
 		boss_pos = _boss_position(boss_age)
 		var mouth := cat_previous.lerp(cat, elapsed / delta)
-		if _boss_contains_mouth(mouth):
+		if disgust <= 0 and _boss_contains_mouth(mouth):
 			boss_gap = 0.0
 			var before := boss_contact
 			boss_contact = minf(3.0, boss_contact + dt)
@@ -844,6 +854,8 @@ func _make_nugget(kind: String, position: Vector2, velocity: Vector2 = Vector2.Z
 		variant, random.randf_range(-PI, PI), random.randf_range(-3, 3))
 
 func _chomp(nugget: Nugget) -> bool:
+	if disgust > 0 and nugget.kind != "burnt":
+		return false
 	if nugget.bite_wait > 0:
 		return false
 	nugget.hp -= 1
@@ -865,7 +877,8 @@ func _eat_nugget(nugget: Nugget, allow_sweep: bool = true) -> void:
 		streak = 0
 		golden_bonus = 0
 		expression = 0
-		offended = 1.0
+		disgust = BURNT_COOLDOWN
+		offended = BURNT_COOLDOWN
 		_sound("reaction_eww")
 		popups.append({"pos": nugget.pos + Vector2(0, -28), "text": "YUCK! -%d" % penalty, "life": 1.0, "color": PINK})
 		return
@@ -888,6 +901,9 @@ func _eat_nugget(nugget: Nugget, allow_sweep: bool = true) -> void:
 
 func _collect_flying_nuggets() -> void:
 	# Deferred until the collision pass ends: never mutate the active iteration.
+	# A burnt bite in the same pass delays an already-earned golden sweep.
+	if disgust > 0:
+		return
 	sweep_pending = false
 	sweep_time = 0.65
 	for i in range(nuggets.size() - 1, -1, -1):
@@ -998,16 +1014,31 @@ func _draw() -> void:
 			_button("BACK TO TITLE", "home")
 			_text("ESC TO RESUME", Vector2(320, 299), 8, MINT, true)
 
-func _cat_sprite(position: Vector2, frame: int, scale_factor: float = 1.5, angle: float = 0.0, pose_scale: Vector2 = Vector2.ONE) -> void:
+func _cat_sprite(position: Vector2, frame: int, scale_factor: float = 1.5, angle: float = 0.0, pose_scale: Vector2 = Vector2.ONE, reacting: bool = false) -> void:
 	var stretch := 1.0 + minf(cat_velocity.length() / 10000, 0.14) if state == Screen.PLAYING else 1.0
 	if expression > 0.30:
 		stretch += 0.10
 	draw_set_transform(position, angle, Vector2(scale_factor / stretch, scale_factor * stretch) * pose_scale)
 	# Atlas and mouth anchor come from sprite metadata; catch position stays stable.
-	draw_texture_rect_region(cat_tex, cat_art.draw_rect(), cat_art.frame_rect(frame))
+	if reacting:
+		draw_texture_rect_region(disgust_tex, disgust_art.draw_rect(), disgust_art.frame_rect(_disgust_frame()))
+	else:
+		draw_texture_rect_region(cat_tex, cat_art.draw_rect(), cat_art.frame_rect(frame))
 	draw_set_transform(Vector2.ZERO)
 
+func _disgust_frame() -> int:
+	# Two wince/spit/recovery cycles during the cooldown; simulation time freezes
+	# on pause and a fresh burnt bite restarts the reaction at its first pose.
+	var elapsed := clampf(BURNT_COOLDOWN - disgust, 0, BURNT_COOLDOWN)
+	return mini(floori(elapsed * 8.0), 15) % disgust_art.frame_count
+
 func _cat_frame() -> int:
+	if disgust > 0:
+		return 5
+	# Rapid boss bites reset `expression` before its closed-mouth threshold.
+	# Follow the bite phase instead so both poses remain visible at 8 chomps/sec.
+	if round_phase == RoundPhase.BOSS and boss_contact > 0 and boss_gap == 0:
+		return 2 if boss_bite_progress >= 0.5 else 3
 	if expression > 0.26:
 		return 6 if streak >= 10 else 2
 	if expression > 0:
@@ -1102,7 +1133,8 @@ func _playfield() -> void:
 		var progress := 1.0 - sweep_time / 0.65
 		draw_arc(sweep_origin, lerpf(12, 650, progress), 0, TAU, 64, Color(1, 0.88, 0.4, (1 - progress) * 0.7), 3)
 	# Ground shadow and trailing paws communicate motion without input lag.
-	draw_set_transform(Vector2(cat.x, 294), 0, Vector2(1, 0.25))
+	var shadow_x := 320.0 if round_phase == RoundPhase.CELEBRATING else cat.x
+	draw_set_transform(Vector2(shadow_x, 294), 0, Vector2(1, 0.25))
 	draw_circle(Vector2.ZERO, 22, Color(0.2, 0.25, 0.23, 0.13))
 	draw_set_transform(Vector2.ZERO)
 	if round_phase == RoundPhase.CELEBRATING:
@@ -1110,12 +1142,13 @@ func _playfield() -> void:
 		draw_rect(Rect2(185, 64, 270, 28), INK)
 		_text("BOSS DEVOURED! +500", Vector2(320, 70), 16, GOLD, true)
 	else:
-		_cat_sprite(cat, _cat_frame(), 1.5, tilt)
-	# Quiet brackets mark the stable mouth target.
-	for sign_x in [-1, 1]:
-		for sign_y in [-1, 1]:
-			var p := cat + Vector2(sign_x * 12, sign_y * 9)
-			draw_line(p, p + Vector2(-sign_x * 3, 0), Color(1, 0.96, 0.79, 0.65))
+		_cat_sprite(cat, _cat_frame(), 1.5, tilt, Vector2.ONE, disgust > 0)
+	# Mouth targeting belongs to gameplay, not the centered victory dance.
+	if round_phase != RoundPhase.CELEBRATING:
+		for sign_x in [-1, 1]:
+			for sign_y in [-1, 1]:
+				var p := cat + Vector2(sign_x * 12, sign_y * 9)
+				draw_line(p, p + Vector2(-sign_x * 3, 0), Color(1, 0.96, 0.79, 0.65))
 	for p in particles:
 		draw_rect(Rect2(p.pos, Vector2.ONE * p.size), p.color)
 	for popup in popups:
@@ -1313,7 +1346,7 @@ func _nugget_guide() -> void:
 	var rows := [
 		["regular", "REGULAR", "10 POINTS", "PER THROW"],
 		["big", "BIG REGULAR", "3 CHOMPS / 30 POINTS", "PER THROW"],
-		["burnt", "BURNT", "AVOID! -30 AND COMBO RESET", "PER THROW"],
+		["burnt", "BURNT", "-30 / COMBO RESET / 2S NO BITES", "PER THROW"],
 		["golden", "GOLDEN", "20 POINTS + ONE MULTIPLIER TIER", "PER THROW"],
 		["big_golden", "BIG GOLDEN", "3 CHOMPS / 100 + COLLECT EDIBLES", "PER ROUND"],
 	]

@@ -15,6 +15,19 @@ func _run() -> void:
 		await _preview_layouts(game)
 		quit()
 		return
+	if "--disgust" in OS.get_cmdline_user_args():
+		game._start_round()
+		game.cat = Vector2(320, 200)
+		game.cat_previous = game.cat
+		game.banner_time = 0
+		game.expression = 0
+		game.cat_velocity = Vector2.ZERO
+		game._select_cat(0)
+		for frame in range(8):
+			game.disgust = game.BURNT_COOLDOWN - (frame + 0.25) / 8.0
+			await _capture(game, "disgust_%02d" % frame)
+		quit()
+		return
 	await _capture(game, "title")
 	if "--title-snacks" in OS.get_cmdline_user_args():
 		game.title_snack_wait = 0

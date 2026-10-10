@@ -1,0 +1,21 @@
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "nugget-cat",
+  "main": "worker.js",
+  "compatibility_date": "2026-10-10",
+  "workers_dev": false,
+  "preview_urls": false,
+  "routes": [
+    { "pattern": "cat-nugget.gorbunov.dev", "custom_domain": true }
+  ],
+  "build": {
+    "command": "python3 ../prepare_cloudflare.py"
+  },
+  "assets": {
+    "directory": "../../build/cloudflare/assets",
+    "binding": "ASSETS",
+    "run_worker_first": ["/index.wasm"],
+    "html_handling": "auto-trailing-slash",
+    "not_found_handling": "none"
+  }
+}
