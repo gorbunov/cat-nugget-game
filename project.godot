@@ -24,6 +24,21 @@ window/size/window_height_override=720
 window/stretch/mode="canvas_items"
 window/stretch/scale_mode="integer"
 
+[input]
+
+confirm={
+"deadzone": 0.5,
+"events": [Object(InputEventKey,"keycode":4194309), Object(InputEventKey,"keycode":32)]
+}
+back={
+"deadzone": 0.5,
+"events": [Object(InputEventKey,"keycode":4194305)]
+}
+toggle_fullscreen={
+"deadzone": 0.5,
+"events": [Object(InputEventKey,"keycode":4194342), Object(InputEventKey,"alt_pressed":true,"keycode":4194309)]
+}
+
 [rendering]
 
 textures/canvas_textures/default_texture_filter=0

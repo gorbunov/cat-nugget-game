@@ -8,7 +8,9 @@
 ## Runtime and structure
 - Keep code searches, tools, generated assets and builds inside this repository.
 - Use Godot 4.7.2 at `/Applications/Godot.app/Contents/MacOS/Godot`; Python tools use the standard library.
-- `main.tscn` is a single `Node2D` wired to `scripts/game.gd`. Gameplay, custom-drawn UI, audio and persistence live there; `_step(delta)` advances simulation and `_draw()` renders it. Coordinates use a 640×360 canvas with integer scaling and nearest filtering.
+- `main.tscn` has a `Node2D` wired to `scripts/game.gd` and an `Audio` child wired to `scripts/game_audio.gd`. The game owns round policy, custom drawing, input and persistence; audio owns players, looping, synchronized stems, reactions and volumes.
+- `_step(delta)` lists simulation phases in order; `_draw()` only renders. Coordinates use a 640×360 canvas with integer scaling and nearest filtering. `scripts/nugget.gd` holds typed mutable flight/bite state; `scripts/difficulty.gd` supplies named pacing values.
+- Screen state uses `ScreenLayout.Screen`. Shared button geometry and hit testing live in `scripts/screen_layout.gd`, independently of drawing. Route transitions through the game helpers and keep inactive overlay-background controls out of hit testing. Keyboard bindings are Input Map actions in `project.godot`.
 - Golden collection runs after the nugget iteration in `_step` to avoid invalidating indices. Preserve `_eat_nugget(nugget, false)` inside the collection sweep to prevent recursive big-golden sweeps.
 
 ## Verification
@@ -21,7 +23,7 @@ GODOT=/Applications/Godot.app/Contents/MacOS/Godot
 "$GODOT" --headless --path . --script tools/test_nuggets.gd
 ```
 
-- The smoke test covers rounds, difficulty, palettes, music selection and saves; `test_nuggets.gd` focuses on bites, hazards, bonuses, collection and spawn odds.
+- `tools/test_smoke.gd` is invoked by the game's `--smoke-test` entry point and covers rounds, difficulty, palettes, music selection, saves and navigation without intervening draws; `test_nuggets.gd` focuses on bites, hazards, bonuses, collection and spawn odds.
 - Test harnesses set `game.test_mode = true` before adding the scene to the tree. This disables live processing and normal save access; smoke-test persistence uses disposable `build/test_save.cfg`. Preserve this to protect player settings/scores.
 - Visual checks require a graphical session, **not** `--headless`:
   `"$GODOT" --path . --script tools/preview.gd -- --nuggets`

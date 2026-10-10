@@ -1,15 +1,10 @@
 extends Node2D
-## All simulation uses a fixed 640x360 logical canvas.
+## Round orchestration and custom drawing on a fixed 640x360 logical canvas.
+## Audio owns playback; ScreenLayout owns interactive geometry; Nugget owns flight state.
 
 const ROUND_LENGTH := 60.0
-# Elapsed seconds, throw interval, flight time to target, music playback rate.
-const DIFFICULTY_STAGES := [
-	Vector4(0, 0.82, 1.05, 1.00),
-	Vector4(15, 0.64, 0.95, 1.04),
-	Vector4(35, 0.48, 0.82, 1.09),
-	Vector4(50, 0.36, 0.75, 1.14),
-	Vector4(60, 0.30, 0.68, 1.20),
-]
+const HAND_RELEASE_TIME := 0.72
+const HAND_LIFETIME := 1.15
 const CATCH_RADIUS := 18.0
 const CHOMP_INTERVAL := 0.20
 const BIG_GOLD_ROUND_CHANCE := 0.18
@@ -33,7 +28,11 @@ const SOUND_CREDITS := [
 	{"title": "YAY.MP3", "author": "ZUT50", "use": "GOLDEN / FULL CLIP", "id": "162395"},
 	{"title": "GULPCARTOONY.MP3", "author": "GARY_IN_WV", "use": "BIG REGULAR / FULL CLIP", "id": "449868"},
 ]
-const CAT_NAMES := ["MOCHI", "BISCUIT", "WAFFLES", "DUMPLING", "NOODLE", "PUDDING", "PICKLES", "PEBBLE", "BUTTONS", "MAPLE", "MISO", "BEAN", "SPROUT", "PUMPKIN", "PIP", "TOFU", "MUFFIN", "POPPY", "BOBA", "TATER"]
+const CAT_NAMES := [
+	"MOCHI", "BISCUIT", "WAFFLES", "DUMPLING", "NOODLE", "PUDDING", "PICKLES",
+	"PEBBLE", "BUTTONS", "MAPLE", "MISO", "BEAN", "SPROUT", "PUMPKIN", "PIP",
+	"TOFU", "MUFFIN", "POPPY", "BOBA", "TATER",
+]
 const TRACKS := [
 	{"name": "SNACK TIME", "mood": "THE ORIGINAL BOUNCY CHIPTUNE", "file": "snack_time", "panic": "panic"},
 	{"name": "SUNNY SIDE UP", "mood": "SUNNY BELLS AND BREEZY GROOVES", "file": "sunny_side_up", "panic": "sunny_side_up_panic"},
@@ -42,30 +41,46 @@ const TRACKS := [
 	{"name": "NUGGET BATTLE", "mood": "BOSS-FIGHT DRUMS AND DRIVING BASS", "file": "nugget_battle", "panic": "nugget_battle_panic"},
 ]
 const CatAppearance := preload("res://scripts/cat_appearance.gd")
+const Nugget := preload("res://scripts/nugget.gd")
+const Difficulty := preload("res://scripts/difficulty.gd")
+const GameAudio := preload("res://scripts/game_audio.gd")
+const ScreenLayout := preload("res://scripts/screen_layout.gd")
+const Screen := ScreenLayout.Screen
 
+# Assets and appearance (the chosen cat persists through pause and results).
 var cat_art := CatAppearance.new()
 var cat_palettes: Array[Dictionary] = []
 var cat_tex: Texture2D
 var nugget_tex: Texture2D = preload("res://assets/nuggets.png")
 var hand_tex: Texture2D = preload("res://assets/hands_ai.png")
 var font: Font = preload("res://assets/pixel_font.fnt")
-var music: AudioStreamPlayer
-var panic_music: AudioStreamPlayer
-var voices: Array[AudioStreamPlayer] = []
-var sounds: Dictionary = {}
-var reaction_voice: AudioStreamPlayer
-var state := "title"
-var previous_state := "title"
+var cat_palette := 0
+var cat_name_index := -1
+var title_cat_selected := false
+
+# Screen navigation and presentation time.
+var state: ScreenLayout.Screen = Screen.TITLE
+var previous_state: ScreenLayout.Screen = Screen.TITLE
 var clock := 0.0
 var results_time := 0.0
-var remaining := ROUND_LENGTH
-var spawn_in := 0.9
+var volume_drag := -1
+
+# Mouth position and visual feedback. `cat` is the catch anchor, not sprite origin.
 var cat := Vector2(320, 180)
 var cat_previous := cat
 var cat_velocity := Vector2.ZERO
 var tilt := 0.0
 var expression := 0.0
 var offended := 0.0
+var banner := ""
+var banner_time := 0.0
+var particles: Array[Dictionary] = []
+var popups: Array[Dictionary] = []
+
+# Round state. _start_round resets these before simulation advances.
+var remaining := ROUND_LENGTH
+var spawn_in := 0.9
+var last_second := 60
 var score := 0
 var catches := 0
 var misses := 0
@@ -78,30 +93,31 @@ var sweep_time := 0.0
 var sweep_origin := Vector2.ZERO
 var streak := 0
 var longest := 0
-var best := 0
 var old_best := 0
+var nuggets: Array[Nugget] = []
+var hands: Array[Dictionary] = []
+var random := RandomNumberGenerator.new()
+
+# Persisted preferences and window restoration state.
+var best := 0
 var master_volume := 1.0
-var volume_drag := -1
 var music_volume := 0.55
 var sfx_volume := 0.7
 var selected_track := 0
 var shuffle_music := true
-var cat_palette := 0
-var cat_name_index := -1
-var title_cat_selected := false
 var fullscreen := false
 var windowed_size := Vector2i(1280, 720)
 var windowed_position := Vector2i.ZERO
-var nuggets: Array[Dictionary] = []
-var hands: Array[Dictionary] = []
-var particles: Array[Dictionary] = []
-var popups: Array[Dictionary] = []
-var buttons: Array[Dictionary] = []
-var banner := ""
-var banner_time := 0.0
-var last_second := 60
-var test_mode := false
-var random := RandomNumberGenerator.new()
+
+# Harnesses set this before entering the tree; previews may temporarily enable audio.
+var test_mode := false:
+	set(value):
+		test_mode = value
+		if is_instance_valid(audio):
+			audio.playback_enabled = not value
+
+@onready var audio: GameAudio = $Audio
+
 
 func _ready() -> void:
 	texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
@@ -120,27 +136,17 @@ func _ready() -> void:
 		get_window().mode = Window.MODE_FULLSCREEN
 	_setup_audio()
 	if smoke_requested:
-		_run_smoke_test.call_deferred()
+		load("res://tools/test_smoke.gd").run.call_deferred(self)
 	queue_redraw()
 
 func _setup_audio() -> void:
-	for sound in ["catch", "combo", "miss", "throw", "tick", "finish", "reaction_eww", "reaction_yay", "reaction_nom"]:
-		sounds[sound] = load("res://assets/%s.wav" % sound)
-	reaction_voice = AudioStreamPlayer.new()
-	add_child(reaction_voice)
-	music = AudioStreamPlayer.new()
-	add_child(music)
-	panic_music = AudioStreamPlayer.new()
-	add_child(panic_music)
-	for i in range(10):
-		var voice := AudioStreamPlayer.new()
-		add_child(voice)
-		voices.append(voice)
 	_set_volumes()
 	_select_track(_random_choice(-1, TRACKS.size()) if shuffle_music else selected_track)
 
 func _random_choice(current: int, count: int) -> int:
 	# Every other choice is equally likely; no immediate repeats.
+	if count == 1:
+		return 0
 	if current < 0:
 		return random.randi_range(0, count - 1)
 	return (current + random.randi_range(1, count - 1)) % count
@@ -152,41 +158,25 @@ func _select_cat(index: int) -> void:
 
 func _select_track(index: int) -> void:
 	selected_track = posmod(index, TRACKS.size())
-	music.stop()
-	panic_music.stop()
-	music.stream = _looped("res://assets/%s.wav" % TRACKS[selected_track].file)
-	panic_music.stream = _looped("res://assets/%s.wav" % TRACKS[selected_track].panic)
-	_set_music_rate(_difficulty_at(ROUND_LENGTH - remaining).z if state in ["playing", "paused"] else 1.0)
-	if not test_mode:
-		music.play()
-		music.stream_paused = state == "paused"
+	var rate := _difficulty_at(ROUND_LENGTH - remaining).music_rate if state in [Screen.PLAYING, Screen.PAUSED] else 1.0
+	audio.select_track(TRACKS[selected_track], rate, state == Screen.PAUSED)
 
-func _difficulty_at(elapsed: float) -> Vector3:
-	for i in range(1, DIFFICULTY_STAGES.size()):
-		var previous: Vector4 = DIFFICULTY_STAGES[i - 1]
-		var next: Vector4 = DIFFICULTY_STAGES[i]
-		if elapsed <= next.x:
-			var weight := smoothstep(previous.x, next.x, elapsed)
-			return Vector3(previous.y, previous.z, previous.w).lerp(Vector3(next.y, next.z, next.w), weight)
-	var last: Vector4 = DIFFICULTY_STAGES[-1]
-	return Vector3(last.y, last.z, last.w)
+func _difficulty_at(elapsed: float) -> Difficulty:
+	return Difficulty.at_time(elapsed)
 
 func _set_music_rate(rate: float) -> void:
-	# Speed and pitch rise together, like an arcade soundtrack. Both stems stay in tune.
-	music.pitch_scale = rate
-	panic_music.pitch_scale = rate
+	audio.set_rate(rate)
 
 func _start_panic_music() -> void:
-	if not test_mode:
-		panic_music.stream_paused = false
-		# The new arrangements have matching tempo, harmony and loop length.
-		panic_music.play(fmod(music.get_playback_position(), panic_music.stream.get_length()))
+	audio.start_finale()
+
+# ---- Window and screen transitions. ----
 
 func _toggle_fullscreen() -> void:
 	var window := get_window()
 	fullscreen = window.mode not in [Window.MODE_FULLSCREEN, Window.MODE_EXCLUSIVE_FULLSCREEN]
 	# A resize changes pointer coordinates; pause first to avoid accidental catches.
-	if state == "playing":
+	if state == Screen.PLAYING:
 		_pause()
 	if fullscreen:
 		windowed_size = window.size
@@ -198,46 +188,38 @@ func _toggle_fullscreen() -> void:
 		window.position = windowed_position
 	_save_settings()
 
-func _close_settings() -> void:
+func _change_screen(next_screen: ScreenLayout.Screen) -> void:
+	state = next_screen
 	volume_drag = -1
-	state = previous_state
-	_set_music_rate(_difficulty_at(ROUND_LENGTH - remaining).z if state == "paused" else 1.0)
-	music.stream_paused = state == "paused"
-	_save_settings()
-	buttons.clear()
+	Input.mouse_mode = Input.MOUSE_MODE_HIDDEN if state == Screen.PLAYING else Input.MOUSE_MODE_VISIBLE
+	queue_redraw()
 
-func _looped(path: String) -> AudioStreamWAV:
-	var stream := load(path).duplicate() as AudioStreamWAV
-	stream.loop_mode = AudioStreamWAV.LOOP_FORWARD
-	stream.loop_begin = 0
-	stream.loop_end = int(stream.get_length() * stream.mix_rate)
-	return stream
+
+func _open_overlay(screen: ScreenLayout.Screen) -> void:
+	previous_state = state
+	_change_screen(screen)
+	if screen == Screen.SETTINGS:
+		_set_music_rate(1.0)
+		audio.resume_music()
+		audio.stop_finale()
+
+
+func _close_overlay() -> void:
+	_change_screen(previous_state)
+	_set_music_rate(_difficulty_at(ROUND_LENGTH - remaining).music_rate if state == Screen.PAUSED else 1.0)
+	if state == Screen.PAUSED:
+		audio.pause()
+	else:
+		audio.resume_music()
+	_save_settings()
 
 func _sound(key: String, pitch: float = 1.0) -> void:
-	if test_mode:
-		return
-	if key.begins_with("reaction_"):
-		# One voice keeps rapid catches intelligible and cannot exhaust the SFX pool.
-		reaction_voice.stream = sounds[key]
-		reaction_voice.pitch_scale = pitch
-		reaction_voice.play()
-		return
-	for voice in voices:
-		if not voice.playing:
-			voice.stream = sounds[key]
-			voice.pitch_scale = pitch
-			voice.play()
-			return
+	audio.play_effect(key, pitch)
 
 func _set_volumes() -> void:
-	var master_bus := AudioServer.get_bus_index("Master")
-	AudioServer.set_bus_volume_db(master_bus, linear_to_db(maxf(0.0001, master_volume)))
-	AudioServer.set_bus_mute(master_bus, master_volume <= 0)
-	reaction_voice.volume_linear = sfx_volume * 0.55
-	music.volume_linear = music_volume
-	panic_music.volume_linear = music_volume * 0.18
-	for voice in voices:
-		voice.volume_linear = sfx_volume * 0.45
+	audio.set_volumes(master_volume, music_volume, sfx_volume)
+
+# ---- Persistence. Test mode never reads or writes the player's save. ----
 
 func _load_settings(path: String = SAVE_PATH) -> void:
 	if test_mode and path == SAVE_PATH:
@@ -267,8 +249,10 @@ func _save_settings(path: String = SAVE_PATH) -> void:
 	if error != OK:
 		push_warning("Could not save settings: %s" % error_string(error))
 
+# ---- Input and UI actions. ----
+
 func _notification(what: int) -> void:
-	if what == NOTIFICATION_APPLICATION_FOCUS_OUT and state == "playing":
+	if what == NOTIFICATION_APPLICATION_FOCUS_OUT and state == Screen.PLAYING:
 		_pause()
 	elif what == NOTIFICATION_WM_CLOSE_REQUEST:
 		_save_settings()
@@ -279,7 +263,7 @@ func _input(event: InputEvent) -> void:
 			volume_drag = -1
 			_save_settings()
 			return
-		if event.pressed and state == "settings":
+		if event.pressed and state == Screen.SETTINGS:
 			for i in range(3):
 				if _volume_slider_rect(i).grow(5).has_point(get_global_mouse_position()):
 					volume_drag = i
@@ -289,63 +273,61 @@ func _input(event: InputEvent) -> void:
 		_drag_volume(get_global_mouse_position().x)
 		return
 	if event is InputEventKey and event.pressed and not event.echo:
-		if event.keycode == KEY_F11 or (event.keycode == KEY_ENTER and event.alt_pressed):
+		if event.is_action_pressed("toggle_fullscreen", false, true):
 			_toggle_fullscreen()
-		elif event.keycode == KEY_ESCAPE:
-			if state == "title":
-				_action("quit")
-			elif state == "playing":
+		elif event.is_action_pressed("back", false, true):
+			if state == Screen.TITLE:
+				_handle_action("quit")
+			elif state == Screen.PLAYING:
 				_pause()
-			elif state == "paused":
+			elif state == Screen.PAUSED:
 				_resume()
-			elif state in ["settings", "guide", "sources"]:
-				_close_settings()
-		elif event.keycode == KEY_ENTER or event.keycode == KEY_SPACE:
-			if state in ["title", "results"]:
-				_start()
-			elif state == "paused":
+			elif state in [Screen.SETTINGS, Screen.GUIDE, Screen.SOURCES]:
+				_close_overlay()
+		elif event.is_action_pressed("confirm", false, true):
+			if state in [Screen.TITLE, Screen.RESULTS]:
+				_start_round()
+			elif state == Screen.PAUSED:
 				_resume()
 	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT and event.pressed:
-		var pointer := get_global_mouse_position()
-		for button in buttons:
-			if button.rect.has_point(pointer):
-				_action(button.action)
-				break
+		_activate_button_at(get_global_mouse_position())
 
-func _action(action: String) -> void:
+func _activate_button_at(pointer: Vector2) -> void:
+	var action := ScreenLayout.action_at(state, pointer)
+	if not action.is_empty():
+		_handle_action(action)
+
+
+func _handle_action(action: String) -> void:
 	_sound("catch", 0.8)
 	match action:
-		"start": _start()
+		"start": _start_round()
 		"resume": _resume()
 		"pause": _pause()
 		"home":
-			state = "title"
+			_change_screen(Screen.TITLE)
 			_set_music_rate(1.0)
 			title_cat_selected = false
-			panic_music.stop()
-			music.stream_paused = false
-			Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
+			audio.stop_finale()
+			audio.resume_music()
 		"cat_shuffle":
-			if state == "title":
+			if state == Screen.TITLE:
 				_select_cat(_random_choice(cat_palette, cat_palettes.size()))
 				title_cat_selected = true
 				expression = 0.42
 		"settings":
-			previous_state = state
-			state = "settings"
-			_set_music_rate(1.0)
-			music.stream_paused = false
-			panic_music.stop()
-		"guide", "sources":
-			previous_state = state
-			state = action
+			_open_overlay(Screen.SETTINGS)
+		"guide":
+			_open_overlay(Screen.GUIDE)
+		"sources":
+			_open_overlay(Screen.SOURCES)
 		"source_488472", "source_162395", "source_449868":
 			if not test_mode:
 				OS.shell_open("https://freesound.org/s/" + action.trim_prefix("source_") + "/")
 		"source_license":
 			if not test_mode:
 				OS.shell_open("https://creativecommons.org/publicdomain/zero/1.0/")
-		"back": _close_settings()
+		"back": _close_overlay()
 		"fullscreen": _toggle_fullscreen()
 		"track_prev", "track_next":
 			shuffle_music = false
@@ -363,12 +345,12 @@ func _action(action: String) -> void:
 		"quit":
 			_save_settings()
 			get_tree().quit()
-	_set_volumes()
-	buttons.clear()
+	if action in ["master_down", "master_up", "music_down", "music_up", "sfx_down", "sfx_up"]:
+		_set_volumes()
 	queue_redraw()
 
 func _volume_slider_rect(index: int) -> Rect2:
-	return Rect2(263, 161 + index * 36, 128, 12)
+	return ScreenLayout.volume_slider_rect(index)
 
 func _drag_volume(pointer_x: float) -> void:
 	var slider := _volume_slider_rect(volume_drag)
@@ -380,8 +362,10 @@ func _drag_volume(pointer_x: float) -> void:
 	_set_volumes()
 	queue_redraw()
 
-func _start() -> void:
-	state = "playing"
+# ---- Round lifecycle and simulation. ----
+
+func _start_round() -> void:
+	_change_screen(Screen.PLAYING)
 	remaining = ROUND_LENGTH
 	_set_music_rate(1.0)
 	if not title_cat_selected:
@@ -408,74 +392,76 @@ func _start() -> void:
 	hands.clear()
 	particles.clear()
 	popups.clear()
-	buttons.clear()
 	cat = get_global_mouse_position().clamp(Vector2(20, 62), Vector2(620, 326))
 	cat_previous = cat
 	cat_velocity = Vector2.ZERO
 	banner = "FOLLOW YOUR APPETITE!"
 	banner_time = 2.0
 	last_second = 60
-	panic_music.stop()
-	music.stream_paused = false
-	if not test_mode and not shuffle_music:
-		music.play()
-	Input.mouse_mode = Input.MOUSE_MODE_HIDDEN
+	audio.stop_finale()
+	audio.resume_music()
+	if not shuffle_music:
+		audio.restart_music()
 
 func _pause() -> void:
-	state = "paused"
-	music.stream_paused = true
-	panic_music.stream_paused = true
-	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
-	buttons.clear()
+	_change_screen(Screen.PAUSED)
+	audio.pause()
 
 func _resume() -> void:
-	state = "playing"
-	_set_music_rate(_difficulty_at(ROUND_LENGTH - remaining).z)
+	_change_screen(Screen.PLAYING)
+	_set_music_rate(_difficulty_at(ROUND_LENGTH - remaining).music_rate)
 	cat = get_global_mouse_position().clamp(Vector2(20, 62), Vector2(620, 326))
 	cat_previous = cat
-	music.stream_paused = false
+	audio.resume_music()
 	if remaining <= 10:
 		_start_panic_music()
-	Input.mouse_mode = Input.MOUSE_MODE_HIDDEN
-	buttons.clear()
 
-func _finish() -> void:
-	state = "results"
+func _finish_round() -> void:
+	_change_screen(Screen.RESULTS)
 	results_time = 0.0
 	expression = 0.0
 	remaining = 0
 	best = maxi(best, score)
 	_save_settings()
-	panic_music.stop()
+	audio.stop_finale()
 	_set_music_rate(1.0)
 	_sound("finish")
-	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
-	buttons.clear()
 
 func _process(delta: float) -> void:
 	if test_mode:
 		return
 	clock += delta
-	if state == "playing":
+	if state == Screen.PLAYING:
 		cat_previous = cat
 		cat = get_global_mouse_position().clamp(Vector2(20, 62), Vector2(620, 326))
 		var velocity := (cat - cat_previous) / maxf(delta, 0.001)
 		cat_velocity = cat_velocity.lerp(velocity, 1.0 - exp(-12 * delta))
 		tilt = lerpf(tilt, clampf(cat_velocity.x / 2200, -0.24, 0.24), 1.0 - exp(-14 * delta))
 		_step(delta)
-	elif state == "title":
+	elif state == Screen.TITLE:
 		expression = maxf(0, expression - delta)
-	elif state == "results":
+	elif state == Screen.RESULTS:
 		results_time += delta
 	queue_redraw()
 
 func _step(delta: float) -> void:
 	remaining = maxf(0, remaining - delta)
 	if remaining <= 0:
-		_finish()
+		_finish_round()
 		return
 	var difficulty := _difficulty_at(ROUND_LENGTH - remaining)
-	_set_music_rate(difficulty.z)
+	_set_music_rate(difficulty.music_rate)
+	_update_round_feedback(delta)
+	_update_spawning(delta, difficulty.throw_interval)
+	_update_hands(delta)
+	_update_nuggets(delta)
+	# Collection must run after collision iteration to avoid invalidating indices.
+	if sweep_pending:
+		_collect_flying_nuggets()
+	_update_effects(delta)
+
+
+func _update_round_feedback(delta: float) -> void:
 	expression = maxf(0, expression - delta)
 	offended = maxf(0, offended - delta)
 	banner_time = maxf(0, banner_time - delta)
@@ -488,38 +474,48 @@ func _step(delta: float) -> void:
 		last_second = ceili(remaining)
 		if remaining <= 10:
 			_sound("tick", 1.0 + (10 - remaining) * 0.025)
+
+
+func _update_spawning(delta: float, throw_interval: float) -> void:
 	spawn_in -= delta
 	if spawn_in <= 0:
 		_spawn_hand()
 		# Preserve timer overshoot so cadence stays consistent across frame rates.
-		spawn_in += difficulty.x * random.randf_range(0.92, 1.08)
+		spawn_in += throw_interval * random.randf_range(0.92, 1.08)
+
+
+func _update_hands(delta: float) -> void:
 	for i in range(hands.size() - 1, -1, -1):
 		var hand: Dictionary = hands[i]
 		hand.age += delta
-		if hand.age >= 0.72 and not hand.released:
+		if hand.age >= HAND_RELEASE_TIME and not hand.released:
 			hand.released = true
 			_release(hand)
-		if hand.age > 1.15:
+		if hand.age > HAND_LIFETIME:
 			hands.remove_at(i)
+
+
+func _update_nuggets(delta: float) -> void:
 	for i in range(nuggets.size() - 1, -1, -1):
-		var n: Dictionary = nuggets[i]
-		var before: Vector2 = n.pos
-		n.age += delta
-		n.bite_wait = maxf(0, n.bite_wait - delta)
-		n.vel.y += n.gravity * delta
-		n.pos += n.vel * delta
-		n.rotation += n.spin * delta
+		var nugget: Nugget = nuggets[i]
+		var previous_position := nugget.pos
+		nugget.age += delta
+		nugget.bite_wait = maxf(0, nugget.bite_wait - delta)
+		nugget.vel.y += nugget.gravity * delta
+		nugget.pos += nugget.vel * delta
+		nugget.rotation += nugget.spin * delta
 		# Swept relative motion prevents tunneling during fast mouse swipes.
-		if _swept_catch(before, n.pos, cat_previous, cat, NUGGET_TYPES[n.kind].radius):
-			if _chomp(n):
+		if _swept_catch(previous_position, nugget.pos, cat_previous, cat, NUGGET_TYPES[nugget.kind].radius):
+			if _chomp(nugget):
 				nuggets.remove_at(i)
-				_eat_nugget(n)
-		elif n.pos.x < -24 or n.pos.x > 664 or n.pos.y > 390 or n.pos.y < -100:
-			if n.kind != "burnt":
+				_eat_nugget(nugget)
+		elif nugget.pos.x < -24 or nugget.pos.x > 664 or nugget.pos.y > 390 or nugget.pos.y < -100:
+			if nugget.kind != "burnt":
 				_miss()
 			nuggets.remove_at(i)
-	if sweep_pending:
-		_collect_flying_nuggets()
+
+
+func _update_effects(delta: float) -> void:
 	for i in range(particles.size() - 1, -1, -1):
 		var p: Dictionary = particles[i]
 		p.life -= delta
@@ -533,9 +529,10 @@ func _step(delta: float) -> void:
 		if popups[i].life <= 0:
 			popups.remove_at(i)
 
-func _swept_catch(n0: Vector2, n1: Vector2, c0: Vector2, c1: Vector2, radius: float = CATCH_RADIUS) -> bool:
-	var start := n0 - c0
-	var end := n1 - c1
+func _swept_catch(nugget_before: Vector2, nugget_after: Vector2,
+		mouth_before: Vector2, mouth_after: Vector2, radius: float = CATCH_RADIUS) -> bool:
+	var start := nugget_before - mouth_before
+	var end := nugget_after - mouth_after
 	return Geometry2D.get_closest_point_to_segment(Vector2.ZERO, start, end).length_squared() <= radius * radius
 
 func _plan_rare_spawns() -> void:
@@ -583,7 +580,7 @@ func _release(hand: Dictionary) -> void:
 	var origin: Vector2 = hand.pos + HAND_GRIPS[2].rotated(hand.angle)
 	var kind: String = hand.get("kind", "regular")
 	var target := Vector2(random.randf_range(210, 430), random.randf_range(160, 270))
-	var flight := _difficulty_at(ROUND_LENGTH - remaining).y
+	var flight := _difficulty_at(ROUND_LENGTH - remaining).flight_time
 	if NUGGET_TYPES[kind].hp == 3:
 		flight *= 1.18
 	var gravity := 155.0
@@ -591,12 +588,11 @@ func _release(hand: Dictionary) -> void:
 	nuggets.append(_make_nugget(kind, origin, velocity, gravity, hand.get("variant", 0)))
 	_sound("throw", random.randf_range(0.85, 1.2))
 
-func _make_nugget(kind: String, position: Vector2, velocity: Vector2 = Vector2.ZERO, gravity: float = 155.0, variant: int = 0) -> Dictionary:
-	return {"kind": kind, "variant": variant, "hp": NUGGET_TYPES[kind].hp, "bite_wait": 0.0,
-		"pos": position, "vel": velocity, "gravity": gravity, "age": 0.0,
-		"rotation": random.randf_range(-PI, PI), "spin": random.randf_range(-3, 3)}
+func _make_nugget(kind: String, position: Vector2, velocity: Vector2 = Vector2.ZERO, gravity: float = 155.0, variant: int = 0) -> Nugget:
+	return Nugget.new(kind, NUGGET_TYPES[kind].hp, position, velocity, gravity,
+		variant, random.randf_range(-PI, PI), random.randf_range(-3, 3))
 
-func _chomp(nugget: Dictionary) -> bool:
+func _chomp(nugget: Nugget) -> bool:
 	if nugget.bite_wait > 0:
 		return false
 	nugget.hp -= 1
@@ -609,7 +605,7 @@ func _chomp(nugget: Dictionary) -> bool:
 	popups.append({"pos": nugget.pos + Vector2(0, -29), "text": "%d CHOMPS LEFT" % nugget.hp, "life": 0.4, "color": CREAM})
 	return false
 
-func _eat_nugget(nugget: Dictionary, allow_sweep: bool = true) -> void:
+func _eat_nugget(nugget: Nugget, allow_sweep: bool = true) -> void:
 	var kind: String = nugget.kind
 	if kind == "burnt":
 		var penalty := mini(30, score)
@@ -645,7 +641,7 @@ func _collect_flying_nuggets() -> void:
 	sweep_time = 0.65
 	for i in range(nuggets.size() - 1, -1, -1):
 		if nuggets[i].kind != "burnt":
-			var nugget: Dictionary = nuggets[i]
+			var nugget: Nugget = nuggets[i]
 			nuggets.remove_at(i)
 			_eat_nugget(nugget, false)
 	banner = "GOLDEN FEAST! EDIBLES COLLECTED!"
@@ -695,7 +691,8 @@ func _panel(rect: Rect2, color: Color = INK) -> void:
 	draw_rect(rect, color)
 	draw_rect(Rect2(rect.position + Vector2(2, 2), rect.size - Vector2(4, 4)), Color("fce8c4"), false, 1)
 
-func _button(label: String, rect: Rect2, action: String, primary: bool = false) -> void:
+func _button(label: String, action: String, primary: bool = false) -> void:
+	var rect := ScreenLayout.button_rect(state, action)
 	var hover := rect.has_point(get_global_mouse_position())
 	var color := GOLD if primary else Color("65536b")
 	if hover:
@@ -704,34 +701,32 @@ func _button(label: String, rect: Rect2, action: String, primary: bool = false) 
 	draw_rect(rect, color)
 	draw_rect(Rect2(rect.position + Vector2(1, 1), rect.size - Vector2(2, 2)), CREAM if hover else color.lightened(0.18), false)
 	_text(label, rect.position + Vector2(rect.size.x / 2, (rect.size.y - 8) / 2 - 1), 8, INK if primary else CREAM, true)
-	buttons.append({"rect": rect, "action": action})
 
 func _draw() -> void:
 	if cat_tex == null:
 		return
-	buttons.clear()
 	_kitchen()
-	if state == "title":
+	if state == Screen.TITLE:
 		_title()
-	elif state == "results":
+	elif state == Screen.RESULTS:
 		_results()
-	elif state == "settings":
+	elif state == Screen.SETTINGS:
 		_settings()
-	elif state == "guide":
+	elif state == Screen.GUIDE:
 		_nugget_guide()
-	elif state == "sources":
+	elif state == Screen.SOURCES:
 		_sources()
 	else:
 		_playfield()
-		if state == "paused":
+		if state == Screen.PAUSED:
 			draw_rect(Rect2(0, 0, 640, 360), Color(0.16, 0.12, 0.20, 0.7))
 			_panel(Rect2(206, 63, 228, 258))
 			_text("SNACK BREAK", Vector2(320, 85), 16, GOLD, true)
 			_text("YOUR NUGGETS CAN WAIT.", Vector2(320, 115), 8, CREAM, true)
-			_button("KEEP MUNCHING", Rect2(240, 141, 160, 30), "resume", true)
-			_button("SETTINGS", Rect2(240, 181, 160, 26), "settings")
-			_button("NUGGET GUIDE", Rect2(240, 215, 160, 26), "guide")
-			_button("BACK TO TITLE", Rect2(240, 249, 160, 26), "home")
+			_button("KEEP MUNCHING", "resume", true)
+			_button("SETTINGS", "settings")
+			_button("NUGGET GUIDE", "guide")
+			_button("BACK TO TITLE", "home")
 			_text("ESC TO RESUME", Vector2(320, 299), 8, MINT, true)
 
 func _kitchen() -> void:
@@ -779,7 +774,7 @@ func _kitchen() -> void:
 		draw_rect(Rect2(x, 302, 2, 44), Color("c1a899"))
 
 func _cat_sprite(position: Vector2, frame: int, scale_factor: float = 1.5, angle: float = 0.0, pose_scale: Vector2 = Vector2.ONE) -> void:
-	var stretch := 1.0 + minf(cat_velocity.length() / 10000, 0.14) if state == "playing" else 1.0
+	var stretch := 1.0 + minf(cat_velocity.length() / 10000, 0.14) if state == Screen.PLAYING else 1.0
 	if expression > 0.30:
 		stretch += 0.10
 	draw_set_transform(position, angle, Vector2(scale_factor / stretch, scale_factor * stretch) * pose_scale)
@@ -802,7 +797,7 @@ func _nugget_region(kind: String, variant: int = 0) -> Rect2:
 	var frame: int = NUGGET_TYPES[kind].frame + (variant if kind == "regular" else 0)
 	return Rect2(frame * 32, 0, 32, 32)
 
-func _golden_glitter(n: Dictionary, size: float) -> void:
+func _golden_glitter(n: Nugget, size: float) -> void:
 	# Staggered glints grow and shrink in whole pixels. Simulation age freezes
 	# them on pause, and deterministic phases leave gameplay randomness alone.
 	var big: bool = n.kind == "big_golden"
@@ -825,7 +820,7 @@ func _golden_glitter(n: Dictionary, size: float) -> void:
 		if pulse > 0.7:
 			draw_rect(Rect2(center - Vector2.ONE, Vector2(3, 3)), shine)
 
-func _draw_flying_nugget(n: Dictionary) -> void:
+func _draw_flying_nugget(n: Nugget) -> void:
 	var kind: String = n.kind
 	var spec: Dictionary = NUGGET_TYPES[kind]
 	var size: float = spec.size * (1.0 - (spec.hp - n.hp) * 0.08)
@@ -854,10 +849,10 @@ func _playfield() -> void:
 	for hand in hands:
 		var age: float = hand.age
 		var direction := Vector2.RIGHT.rotated(hand.angle)
-		var slide := clampf(age / 0.18, 0, 1) * clampf((1.15 - age) / 0.2, 0, 1)
+		var slide := clampf(age / 0.18, 0, 1) * clampf((HAND_LIFETIME - age) / 0.2, 0, 1)
 		var pos: Vector2 = hand.pos - direction * (1.0 - slide) * 58
 		draw_set_transform(pos, hand.angle)
-		var frame := 0 if age < 0.4 else (1 if age < 0.72 else 2)
+		var frame := 0 if age < 0.4 else (1 if age < HAND_RELEASE_TIME else 2)
 		if not hand.released:
 			var kind: String = hand.get("kind", "regular")
 			var held_size := 24.0 if NUGGET_TYPES[kind].hp == 3 else 16.0
@@ -906,7 +901,7 @@ func _hud() -> void:
 	_text("%02d" % ceili(remaining), Vector2(320, 15), 24, PINK if remaining <= 10 else CREAM, true)
 	_text("BEST %05d" % best, Vector2(398, 11), 8, MINT)
 	_text("%d CAUGHT" % catches, Vector2(398, 28), 8)
-	_button("II", Rect2(588, 11, 34, 27), "pause")
+	_button("II", "pause")
 	# Bottom prompt sits on the counter.
 	_text("MOUSE TO MUNCH", Vector2(12, 345), 8, INK)
 	_text("%s / %s" % [CAT_NAMES[cat_name_index], cat_palettes[cat_palette].name], Vector2(320, 345), 8, INK, true)
@@ -920,11 +915,10 @@ func _title() -> void:
 	_text("CAT", Vector2(224, 119), 40, CREAM, true)
 	_text("NO THOUGHTS. JUST CHICKEN.", Vector2(224, 173), 8, PINK, true)
 	# Cat portrait on a warm little stage.
-	var portrait := Rect2(415, 74, 159, 146)
+	var portrait := ScreenLayout.button_rect(state, "cat_shuffle")
 	var hovered := portrait.has_point(get_global_mouse_position())
 	draw_rect(portrait, Color("675367"))
 	draw_rect(Rect2(422, 81, 145, 132), MINT if hovered else Color("806678"), false, 2)
-	buttons.append({"rect": portrait, "action": "cat_shuffle"})
 	_cat_sprite(Vector2(495, 151 + sin(clock * 2.5) * 4), 6 if expression > 0 or fmod(clock, 5) > 4 else (1 if fmod(clock, 4) < 0.15 else 0), 2.8, sin(clock * 1.8) * 0.06)
 	_text(CAT_NAMES[cat_name_index], Vector2(495, 223), 8, GOLD, true)
 	_text("CLICK TO MEET ANOTHER CAT", Vector2(495, 237), 8, MINT if hovered else CREAM, true)
@@ -933,12 +927,12 @@ func _title() -> void:
 	draw_set_transform(Vector2.ZERO)
 	_text("MOVE YOUR MOUSE. CATCH THE NUGGETS.", Vector2(224, 205), 8, CREAM, true)
 	_text("60 SECONDS. ONE VERY HUNGRY CAT.", Vector2(224, 221), 8, MINT, true)
-	_button("LET'S EAT!", Rect2(100, 247, 245, 36), "start", true)
-	_button("SETTINGS", Rect2(366, 252, 105, 26), "settings")
-	_button("QUIT", Rect2(483, 252, 78, 26), "quit")
+	_button("LET'S EAT!", "start", true)
+	_button("SETTINGS", "settings")
+	_button("QUIT", "quit")
 	_text("BEST SNACK SCORE: %05d" % best, Vector2(224, 290), 8, GOLD, true)
-	_button("SOURCES", Rect2(169, 308, 110, 18), "sources")
-	_button("NUGGET GUIDE + ODDS", Rect2(366, 293, 195, 24), "guide")
+	_button("SOURCES", "sources")
+	_button("NUGGET GUIDE + ODDS", "guide")
 	_text("ENTER: START  /  ESC: QUIT  /  F11: FULLSCREEN", Vector2(320, 348), 8, INK, true)
 
 func _victory_dance() -> void:
@@ -977,8 +971,8 @@ func _results() -> void:
 		var x := 172 + i * 98
 		_text(["CAUGHT", "MISSED", "BURNT", "STREAK"][i], Vector2(x, 205), 8, MINT, true)
 		_text("%d" % [catches, misses, burnt_eaten, longest][i], Vector2(x, 225), 16, CREAM, true)
-	_button("ANOTHER HELPING", Rect2(146, 270, 210, 34), "start", true)
-	_button("TITLE", Rect2(375, 274, 118, 26), "home")
+	_button("ANOTHER HELPING", "start", true)
+	_button("TITLE", "home")
 
 func _nugget_guide() -> void:
 	draw_rect(Rect2(0, 0, 640, 360), Color(0.2, 0.17, 0.23, 0.35))
@@ -1002,7 +996,7 @@ func _nugget_guide() -> void:
 		_text("%d%%" % NUGGET_TYPES[row[0]].chance, Vector2(505, y), 8, GOLD, true)
 		_text(row[3], Vector2(505, y + 14), 8, MINT, true)
 	_text("THROW ODDS AFTER 12S / TWO BIG GOLDENS: %.2f%%" % (BIG_GOLD_ROUND_CHANCE * SECOND_BIG_GOLD_CHANCE * 100), Vector2(320, 284), 8, MINT, true)
-	_button("READY TO SNACK", Rect2(240, 306, 160, 26), "back", true)
+	_button("READY TO SNACK", "back", true)
 
 func _sources() -> void:
 	draw_rect(Rect2(0, 0, 640, 360), Color(0.2, 0.17, 0.23, 0.35))
@@ -1015,192 +1009,34 @@ func _sources() -> void:
 		_text(credit.title, Vector2(100, y), 8, GOLD)
 		_text("BY " + credit.author + " / CC0", Vector2(100, y + 15), 8, CREAM)
 		_text(credit.use, Vector2(100, y + 30), 8, MINT)
-		_button("SOURCE", Rect2(440, y + 6, 98, 26), "source_" + credit.id)
+		_button("SOURCE", "source_" + credit.id)
 	_text("TRIMMED / LEVELS BALANCED / EDGE FADES", Vector2(320, 272), 8, CREAM, true)
 	_text("SOURCE AND LICENSE BUTTONS OPEN YOUR BROWSER", Vector2(320, 286), 8, MINT, true)
-	_button("CC0 LICENSE", Rect2(160, 308, 150, 24), "source_license")
-	_button("BACK", Rect2(330, 308, 150, 24), "back", true)
+	_button("CC0 LICENSE", "source_license")
+	_button("BACK", "back", true)
 
 func _settings() -> void:
 	draw_rect(Rect2(0, 0, 640, 360), Color(0.2, 0.17, 0.23, 0.3))
 	_panel(Rect2(120, 20, 400, 320))
 	_text("MAKE YOURSELF AT HOME", Vector2(320, 38), 16, GOLD, true)
-	_button("MUSIC: RANDOM EACH ROUND" if shuffle_music else "MUSIC: KEEP THIS TRACK", Rect2(215, 58, 210, 18), "shuffle")
+	_button("MUSIC: RANDOM EACH ROUND" if shuffle_music else "MUSIC: KEEP THIS TRACK", "shuffle")
 	_text("MUSIC TRACK %d / %d" % [selected_track + 1, TRACKS.size()], Vector2(320, 79), 8, MINT, true)
-	_button("<", Rect2(153, 100, 32, 26), "track_prev")
+	_button("<", "track_prev")
 	_text(TRACKS[selected_track].name, Vector2(320, 106), 16, CREAM, true)
-	_button(">", Rect2(455, 100, 32, 26), "track_next")
+	_button(">", "track_next")
 	_text(TRACKS[selected_track].mood, Vector2(320, 134), 8, PINK, true)
 	for i in range(3):
 		var y := 153 + i * 36
 		var value: float = [master_volume, music_volume, sfx_volume][i]
 		var key: String = ["master", "music", "sfx"][i]
 		_text(["MASTER", "MUSIC", "SOUNDS"][i], Vector2(145, y + 8), 8)
-		_button("-", Rect2(221, y, 28, 26), key + "_down")
+		_button("-", key + "_down")
 		var slider := _volume_slider_rect(i)
 		draw_rect(slider, Color("725866"))
 		draw_rect(Rect2(slider.position, Vector2(slider.size.x * value, slider.size.y)), GOLD)
 		draw_rect(Rect2(slider.position + Vector2(slider.size.x * value - 2, -3), Vector2(4, 18)), CREAM)
-		_button("+", Rect2(405, y, 28, 26), key + "_up")
+		_button("+", key + "_up")
 		_text("%d%%" % roundi(value * 100), Vector2(447, y + 8), 8, MINT)
-	_button("FULLSCREEN: ON" if fullscreen else "FULLSCREEN: OFF", Rect2(153, 264, 202, 26), "fullscreen")
+	_button("FULLSCREEN: ON" if fullscreen else "FULLSCREEN: OFF", "fullscreen")
 	_text("F11 / ALT+ENTER", Vector2(368, 273), 8, MINT)
-	_button("ALL GOOD", Rect2(251, 302, 138, 28), "back", true)
-
-func _run_smoke_test() -> void:
-	# Deterministic behavioral checks; does not touch real save data.
-	random.seed = 12345
-	_start()
-	assert(state == "playing" and remaining == 60 and score == 0)
-	assert(_swept_catch(Vector2(100, 100), Vector2(300, 100), Vector2(200, 100), Vector2(200, 100)))
-	assert(_swept_catch(Vector2(200, 100), Vector2(200, 100), Vector2(100, 100), Vector2(300, 100)))
-	assert(not _swept_catch(Vector2(100, 200), Vector2(300, 200), Vector2(200, 100), Vector2(200, 100)))
-	for i in range(5):
-		_catch(Vector2(320, 180))
-	assert(score == 50 and _multiplier() == 2 and longest == 5)
-	_catch(Vector2(320, 180))
-	assert(score == 70)
-	_miss()
-	assert(streak == 0 and _multiplier() == 1 and misses == 1 and score == 70)
-	for i in range(30):
-		_catch(Vector2(320, 180))
-	assert(_multiplier() == 5)
-	_pause()
-	assert(state == "paused")
-	_resume()
-	assert(state == "playing")
-	_notification(NOTIFICATION_APPLICATION_FOCUS_OUT)
-	assert(state == "paused")
-	_resume()
-	_start()
-	cat = Vector2(-500, -500)
-	cat_previous = cat
-	var throw_buckets := [0, 0, 0]
-	var previous_rate := 1.0
-	for i in range(3601):
-		if state == "playing":
-			var count_before := throws
-			_step(1.0 / 60.0)
-			throw_buckets[mini(2, i / 1200)] += throws - count_before
-			if i == 59:
-				assert(throws >= 1) # First nugget arrives in the first second.
-			if state == "playing":
-				assert(music.pitch_scale >= previous_rate and music.pitch_scale <= 1.2001)
-				assert(is_equal_approx(music.pitch_scale, panic_music.pitch_scale))
-				previous_rate = music.pitch_scale
-	assert(state == "results" and remaining == 0)
-	assert(misses > 30 and catches == 0)
-	assert(throw_buckets[0] >= 24 and throw_buckets[1] > throw_buckets[0] and throw_buckets[2] > throw_buckets[1])
-	assert(is_equal_approx(music.pitch_scale, 1.0))
-	print("PACE CHECK: throws per 20 seconds: %s; peak music speed: %.2fx" % [throw_buckets, previous_rate])
-	var simulated_misses := misses
-	_start()
-	assert(is_equal_approx(music.pitch_scale, 1.0))
-	remaining = 8
-	_step(0.01)
-	var late_rate := music.pitch_scale
-	assert(late_rate > 1.14)
-	_pause()
-	_action("settings")
-	assert(is_equal_approx(music.pitch_scale, 1.0))
-	_action("track_next")
-	_action("back")
-	assert(is_equal_approx(music.pitch_scale, late_rate))
-	_resume()
-	assert(is_equal_approx(panic_music.pitch_scale, late_rate))
-	_action("home")
-	assert(is_equal_approx(music.pitch_scale, 1.0))
-	_start()
-	assert(nuggets.is_empty() and hands.is_empty() and score == 0 and misses == 0)
-	for i in range(TRACKS.size()):
-		_select_track(i)
-		assert(music.stream.get_length() > 25 and music.stream.loop_mode == AudioStreamWAV.LOOP_FORWARD)
-		if i > 0:
-			assert(is_equal_approx(music.stream.get_length(), panic_music.stream.get_length()))
-	_select_track(-1)
-	assert(selected_track == TRACKS.size() - 1)
-	_action("track_next")
-	assert(selected_track == 0)
-	assert(not shuffle_music)
-	_start()
-	assert(selected_track == 0) # Manual selection survives a new round.
-	_action("shuffle")
-	assert(shuffle_music)
-	var seen_tracks := {}
-	var seen_cats := {}
-	for i in range(48):
-		var previous_track := selected_track
-		var previous_cat := cat_palette
-		_start()
-		assert(selected_track != previous_track and cat_palette != previous_cat)
-		seen_tracks[selected_track] = true
-		seen_cats[cat_palette] = true
-		var round_track := selected_track
-		var round_cat := cat_palette
-		_pause()
-		_resume()
-		assert(selected_track == round_track and cat_palette == round_cat)
-	assert(seen_tracks.size() == TRACKS.size() and seen_cats.size() == cat_palettes.size())
-	_action("home")
-	var before_click := cat_palette
-	var name_before_click := cat_name_index
-	_action("cat_shuffle")
-	assert(cat_palette != before_click and cat_name_index != name_before_click and state == "title")
-	var clicked_color := cat_palette
-	var clicked_name := cat_name_index
-	_start()
-	assert(cat_palette == clicked_color and cat_name_index == clicked_name and not title_cat_selected)
-	_start()
-	assert(cat_palette != clicked_color and cat_name_index != clicked_name) # Replay resumes normal randomization.
-	var role_examples := {}
-	for pixel in range(cat_art.indices.size()):
-		role_examples[cat_art.indices[pixel]] = Vector2i(pixel % cat_art.image_size.x, pixel / cat_art.image_size.x)
-	assert(role_examples.size() == cat_art.roles.size())
-	for palette_index in range(cat_palettes.size()):
-		var texture := cat_art.texture_for_palette(palette_index)
-		assert(texture == cat_art.texture_for_palette(palette_index)) # Cached, not rebuilt.
-		var image := texture.get_image()
-		assert(image.get_size() == cat_art.image_size and image.get_pixelv(role_examples[0]).a == 0)
-		for role in range(1, cat_art.roles.size()):
-			var expected := Color(str(cat_palettes[palette_index].colors[cat_art.roles[role]]))
-			assert(image.get_pixelv(role_examples[role]).to_rgba32() == expected.to_rgba32())
-		for frame in range(cat_art.frame_count):
-			assert(image.get_region(Rect2i(cat_art.frame_rect(frame))).get_used_rect().has_area())
-	# Exercise actual persistence against a disposable project-local file.
-	if not OS.has_feature("standalone"):
-		DirAccess.make_dir_recursive_absolute("res://build")
-		best = 1234
-		master_volume = 0.6
-		music_volume = 0.3
-		sfx_volume = 0.8
-		selected_track = 2
-		shuffle_music = false
-		fullscreen = true
-		_save_settings("res://build/test_save.cfg")
-		best = 0
-		master_volume = 0
-		music_volume = 0
-		sfx_volume = 0
-		selected_track = 0
-		shuffle_music = true
-		fullscreen = false
-		_load_settings("res://build/test_save.cfg")
-		assert(best == 1234 and is_equal_approx(music_volume, 0.3) and is_equal_approx(sfx_volume, 0.8))
-		assert(is_equal_approx(master_volume, 0.6))
-		var legacy := ConfigFile.new()
-		assert(legacy.load("res://build/test_save.cfg") == OK)
-		legacy.erase_section_key("audio", "master")
-		assert(legacy.save("res://build/test_save.cfg") == OK)
-		_load_settings("res://build/test_save.cfg")
-		assert(is_equal_approx(master_volume, 1.0))
-		volume_drag = 0
-		_drag_volume(_volume_slider_rect(0).position.x - 10)
-		assert(master_volume == 0 and AudioServer.is_bus_mute(0))
-		_drag_volume(_volume_slider_rect(0).end.x + 10)
-		assert(master_volume == 1 and not AudioServer.is_bus_mute(0))
-		assert(is_equal_approx(music.volume_linear, music_volume))
-		volume_drag = -1
-		assert(selected_track == 2 and fullscreen and not shuffle_music)
-		DirAccess.remove_absolute("res://build/test_save.cfg")
-	print("SMOKE TEST PASSED: gameplay (%d misses), %d tracks, 48 randomized rounds, %d external cat palettes, indexed roles, cached textures, all animation frames, manual selection, saved preferences." % [simulated_misses, TRACKS.size(), cat_palettes.size()])
-	get_tree().quit(0)
+	_button("ALL GOOD", "back", true)

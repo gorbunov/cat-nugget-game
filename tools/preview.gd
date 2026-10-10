@@ -12,22 +12,22 @@ func _run() -> void:
 	game.clock = 1.0
 	await _capture(game, "title")
 	if "--sources" in OS.get_cmdline_user_args():
-		game._action("sources")
-		assert(game.state == "sources")
+		game._handle_action("sources")
+		assert(game.state == game.Screen.SOURCES)
 		await _capture(game, "sources")
-		game._action("back")
-		assert(game.state == "title")
-		game._action("sources")
+		game._handle_action("back")
+		assert(game.state == game.Screen.TITLE)
+		game._handle_action("sources")
 		var escape := InputEventKey.new()
 		escape.keycode = KEY_ESCAPE
 		escape.pressed = true
 		game._input(escape)
-		assert(game.state == "title")
+		assert(game.state == game.Screen.TITLE)
 	if "--nuggets" in OS.get_cmdline_user_args():
-		game._action("guide")
+		game._handle_action("guide")
 		await _capture(game, "nugget_guide")
-		game._action("back")
-	game._start()
+		game._handle_action("back")
+	game._start_round()
 	game.cat = Vector2(340, 210)
 	game.cat_previous = game.cat
 	for i in range(330):
@@ -42,7 +42,7 @@ func _run() -> void:
 		game.cat = Vector2(320, 275)
 		var types := ["regular", "big", "burnt", "golden", "big_golden"]
 		for i in range(types.size()):
-			var nugget: Dictionary = game._make_nugget(types[i], Vector2(110 + i * 105, 172), Vector2.ZERO, 0)
+			var nugget = game._make_nugget(types[i], Vector2(110 + i * 105, 172), Vector2.ZERO, 0)
 			nugget.rotation = 0.2
 			game.nuggets.append(nugget)
 		await _capture(game, "nugget_types")
@@ -61,12 +61,12 @@ func _run() -> void:
 		await _capture(game, "hands_in_game")
 	game._pause()
 	await _capture(game, "pause")
-	game._action("settings")
+	game._handle_action("settings")
 	game._select_track(1)
 	await _capture(game, "settings")
 	if "--cat-colors" in OS.get_cmdline_user_args():
 		for i in range(game.cat_palettes.size()):
-			game.state = "title"
+			game._change_screen(game.Screen.TITLE)
 			game._select_cat(i)
 			game.expression = 0
 			await _capture(game, "cat_" + game.cat_palettes[i].name.to_lower())
@@ -83,7 +83,7 @@ func _run() -> void:
 	game.catches = 58
 	game.misses = 9
 	game.longest = 23
-	game._finish()
+	game._finish_round()
 	await _capture(game, "results")
 	if "--dance" in OS.get_cmdline_user_args():
 		var board := Image.create(528, 246, false, Image.FORMAT_RGBA8)
@@ -102,13 +102,13 @@ func _run() -> void:
 func _check_settings(game: Node2D) -> void:
 	# Toggle through both shortcuts using the actual window, without saving test preferences.
 	var original_size := root.size
-	game._start()
+	game._start_round()
 	var event := InputEventKey.new()
 	event.keycode = KEY_F11
 	event.pressed = true
 	game._input(event)
 	await create_timer(1.2).timeout
-	assert(root.mode == Window.MODE_FULLSCREEN and game.state == "paused")
+	assert(root.mode == Window.MODE_FULLSCREEN and game.state == game.Screen.PAUSED)
 	await _capture(game, "fullscreen")
 	event.keycode = KEY_ENTER
 	event.alt_pressed = true
@@ -118,28 +118,28 @@ func _check_settings(game: Node2D) -> void:
 	assert(root.mode == Window.MODE_WINDOWED and root.size == original_size)
 	# Preview music from pause, then return to a paused game.
 	game.remaining = 8
-	game._action("settings")
+	game._handle_action("settings")
 	for i in range(game.TRACKS.size()):
 		game._select_track(i)
-		game.music.play()
+		game.audio.music.play()
 		await create_timer(0.15).timeout
-		assert(game.music.playing and game.music.get_playback_position() > 0)
-		assert(is_equal_approx(game.music.pitch_scale, 1.0))
-		game._action("back")
-		assert(game.state == "paused" and game.music.stream_paused)
-		assert(game.music.pitch_scale > 1.14)
-		game._action("settings")
-		assert(not game.music.stream_paused)
-	game._action("back")
+		assert(game.audio.music.playing and game.audio.music.get_playback_position() > 0)
+		assert(is_equal_approx(game.audio.music.pitch_scale, 1.0))
+		game._handle_action("back")
+		assert(game.state == game.Screen.PAUSED and game.audio.music.stream_paused)
+		assert(game.audio.music.pitch_scale > 1.14)
+		game._handle_action("settings")
+		assert(not game.audio.music.stream_paused)
+	game._handle_action("back")
 	game.remaining = 8
 	game.test_mode = false
 	game._resume()
-	assert(game.panic_music.playing)
-	assert(is_equal_approx(game.panic_music.pitch_scale, game.music.pitch_scale))
+	assert(game.audio.finale.playing)
+	assert(is_equal_approx(game.audio.finale.pitch_scale, game.audio.music.pitch_scale))
 	game.test_mode = true
 	game._pause()
-	game.music.stop()
-	game.panic_music.stop()
+	game.audio.music.stop()
+	game.audio.finale.stop()
 	await create_timer(0.1).timeout
 	print("SETTINGS CHECK PASSED: F11 fullscreen, Alt+Enter window restore, pause safety, %d audio previews, paused return, finale audio after track change." % game.TRACKS.size())
 

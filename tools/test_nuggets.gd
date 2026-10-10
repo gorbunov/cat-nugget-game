@@ -5,7 +5,7 @@ func _initialize() -> void:
 	_run.call_deferred()
 
 func _reset(game: Node2D) -> void:
-	game._start()
+	game._start_round()
 	game.spawn_in = 1000
 	game.rare_spawn_times.clear()
 	game.remaining = 40
@@ -18,7 +18,7 @@ func _run() -> void:
 	root.add_child(game)
 	game.random.seed = 71428
 	_reset(game)
-	var big: Dictionary = game._make_nugget("big", game.cat, Vector2.ZERO, 0)
+	var big = game._make_nugget("big", game.cat, Vector2.ZERO, 0)
 	game.nuggets.append(big)
 	game._step(0.016)
 	assert(big.hp == 2 and game.catches == 0 and game.score == 0)
@@ -103,7 +103,7 @@ func _run() -> void:
 	game.remaining = 59
 	for i in range(100):
 		assert(game._next_nugget_kind() == "regular")
-	game._start()
+	game._start_round()
 	assert(game.burnt_eaten == 0 and game.golden_bonus == 0 and game.sweep_time == 0)
 	print("SPECIAL NUGGET TEST PASSED: three chomps, retained progress, burnt avoidance/penalty, golden tiers, safe sweep, double-rare safety, warm-up and replay.")
 	print("ODDS CHECK (20,000 samples): ordinary throws=%s; rare rounds=%d; double-rare rounds=%d" % [counts, rare_rounds, double_rounds])

@@ -217,8 +217,13 @@ location (`~/Library/Application Support/Godot/app_userdata/Nugget Cat/`).
 
 | Path | Purpose |
 |---|---|
-| `scripts/game.gd` | Gameplay, UI, animation, sound playback, persistence |
-| `main.tscn` | Main scene |
+| `scripts/game.gd` | Round lifecycle, simulation, input, custom drawing and persistence |
+| `scripts/game_audio.gd` | Scene-owned music, synchronized finale, effects pool and reaction voice |
+| `scripts/screen_layout.gd` | Screen enum and shared geometry for drawing and button hit testing |
+| `scripts/nugget.gd` | Typed mutable nugget flight and bite state |
+| `scripts/difficulty.gd` | Smooth pacing curve with named throw interval, flight time and music rate |
+| `scripts/cat_appearance.gd` | Indexed palette validation and cached cat textures |
+| `main.tscn` | Main Node2D with an Audio child node |
 | `assets/` | Original PNG sprite sheets, bitmap font, synthesized WAV audio |
 | `tools/generate_assets.py` | Reproducible art/audio generator, Python standard library only |
 | `tools/compose_music.py` | Four additional compositions, MIDI sources and matching finale layers |
@@ -232,11 +237,40 @@ location (`~/Library/Application Support/Godot/app_userdata/Nugget Cat/`).
 | `tools/generate_nugget_sprites.gd` | Local six-frame nugget art for offline playtests |
 | `tools/prepare_nuggets.gd` | Convert the API nugget sheet into the same game atlas |
 | `tools/test_nuggets.gd` | Multi-chomp, hazard, buff, sweep and probability integration checks |
+| `tools/test_smoke.gd` | Round, music, palette, persistence and navigation checks; invoked with `--smoke-test` |
 | `art_sources/` | Generated source, request metadata and enlarged sprite preview; ignored by Godot |
 | `tools/fetch_template.py` | Fetch matching macOS template into this project using HTTP byte ranges |
 | `tools/preview.gd` | Render five actual game screens for inspection |
 | `export_presets.cfg` | Local macOS export configuration |
 | `build/` | App, zip, export template, and preview screenshots; ignored by Godot |
+
+### Code organization
+
+The game keeps its 640×360 custom renderer and a small scene tree. `game.gd`
+coordinates a round; `_step(delta)` lists the simulation phases in execution
+order. Golden collection runs after nugget collisions, so removing collected
+food cannot invalidate that iteration. Each flying nugget is a shared, typed
+`RefCounted` record used by simulation, drawing and the preview tools.
+
+`game_audio.gd` owns playback nodes and volume application. The game decides when
+to select a track, pause, or start the finale; the audio component handles how.
+It is an ordinary child of the main scene, with no global singleton state.
+
+Screen changes use `ScreenLayout.Screen` and the transition helpers in
+`game.gd`. Button rectangles live in `screen_layout.gd`; drawing and hit testing
+use that same geometry. Only the active screen accepts clicks, even before its
+first draw. Keyboard shortcuts are the `confirm`, `back`, and
+`toggle_fullscreen` actions in Project Settings → Input Map.
+
+When extending the game:
+- Add nugget rules in `NUGGET_TYPES` and the consumption/spawn helpers, and cover
+  new mechanics in `tools/test_nuggets.gd`.
+- Add a screen's button geometry in `screen_layout.gd`, its presentation and
+  actions in `game.gd`, and navigation checks in `tools/test_smoke.gd`.
+- Keep rendering free of simulation changes and random-number consumption.
+- Set `test_mode` before adding test scenes to the tree. It suppresses live
+  processing, audio playback and normal save access; persistence tests use a
+  disposable file under `build/`.
 
 ## Development commands
 
