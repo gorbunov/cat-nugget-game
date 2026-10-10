@@ -1,4 +1,4 @@
-# Nugget Cat · 0.8.0
+# Nugget Cat · 0.11.1
 
 A tiny, original pixel-art arcade game for Godot 4.7.2 and macOS.
 An orange cat. Sixty seconds. An unreasonable amount of chicken.
@@ -50,7 +50,7 @@ without repeating the preceding color. Its color stays the same during gameplay,
 pause, and results. The palette swap changes fur, highlights, and belly while
 preserving mouth, blush, outlines, and transparency across all animations.
 Eyes are coordinated with the fur: **Ginger → green, Snow → blue, Silver → teal,
-Cocoa → amber, Lavender → honey-gold, Mint → blue, Charcoal → gold**. Colored
+Cocoa → amber, Lavender → honey-gold, Mint → blue, Charcoal → emerald**. Colored
 irises retain dark pupils and bright highlights; blinking and sleeping eyes stay
 closed. Charcoal uses soft gray highlights for a readable black-ish coat.
 Each cat also gets one of 20 cute names, such as Mochi, Biscuit, Waffles, Dumpling,
@@ -60,10 +60,87 @@ Click the cat portrait on the title screen to meet another randomly named and
 colored cat, with no immediate repeats of either. That name/color pair is used
 for the next round; subsequent replays resume automatic randomization.
 
-Each catch earns 10 points times your multiplier. Every five consecutive catches
+### AI cat art and editable palettes
+
+The cat now uses an AI-generated eight-frame animation sheet, cleaned up into
+64×64 pixel-art frames. A single **palette-indexed** atlas contains the shape and
+animation information for every color variant. Its red channel stores role IDs,
+not visible colors, so `assets/cat_indexed.png` looks nearly black on its own.
+
+- **`assets/cat_palettes.json`** — editable colors and named palettes.
+- **`assets/cat_sprite.json`** — role names, frame layout, display size and mouth anchor.
+- **`scripts/cat_appearance.gd`** — validated palette loading and lazy texture cache.
+- **`art_sources/cat_v001.png`** — original API-generated source image.
+- **`art_sources/cat_v001_palette_preview.png`** — all palettes and expressions.
+
+Each palette can override fur/shadow/highlight, belly, iris/highlight, pink
+accents, outline and white highlights. Omitted colors inherit `defaults`.
+To add another color, append an entry to the `palettes` array, for example:
+
+```json
+{
+  "name": "PEACH",
+  "colors": {
+    "fur_shadow": "b87569",
+    "fur": "e9a18a",
+    "fur_light": "ffd0ab",
+    "belly_shadow": "d9b79a",
+    "belly": "ffe8ca",
+    "iris": "77a685",
+    "iris_light": "c1e6b5"
+  }
+}
+```
+
+Restart the game to load palette edits; rebuild the app to ship them. No API call,
+new artwork, or gameplay-code change is needed. Random selection automatically
+includes added palettes. Role IDs/order in `cat_sprite.json` describe the atlas
+format: keep them stable unless rebuilding the indexed sheet. Keep that texture's
+import lossless, without mipmaps or alpha-border fixing.
+
+Recoloring uses byte-indexed lookup tables, not source-RGB comparisons or manually
+painted eye coordinates. A texture is created on first use of a palette, then
+cached and reused; there is no recoloring work during animation playback.
+
+Regular catches earn 10 points times your multiplier. Every five consecutive catches
 raises the multiplier for subsequent catches, up to ×5. A miss resets the combo
 without subtracting points. The last ten seconds are **SNACK PANIC!**
 Nuggets still airborne at the buzzer are discarded, not counted as misses.
+At the end of each round, your cat celebrates with a looping victory dance:
+hops, squishy landings, side-to-side wiggles, turns, silly expressions and sparkles.
+The same cat, name, fur and eye palette carry through to the results screen.
+
+### Nugget types and spawn odds
+
+Open **Nugget Guide + Odds** on the title screen, or **Nugget Guide** while paused.
+
+| Type | Base score | Effect | Chance |
+|---|---:|---|---:|
+| Regular | 10 | One automatic chomp; two crispy silhouettes | 70% per ordinary throw |
+| Big regular | 30 | Three automatic chomps | 15% per ordinary throw |
+| Burnt | — | Avoid; eating one costs up to 30 points and resets combo/golden bonus | 11% per ordinary throw |
+| Golden | 20 | Adds one multiplier tier, capped at ×5 | 4% per ordinary throw |
+| Big golden | 100 | Three chomps, then collects all edible flying nuggets | 18% chance per round |
+
+All edible base scores use the current multiplier. Stay on a big nugget to chomp
+three times, 0.2 seconds apart; bite progress is retained if you move away. Each
+bite slows it down and its three pips show progress. Missing edible food resets
+the combo and golden bonus. Letting burnt food fly away has no penalty. Burnt
+nuggets remain on screen during a golden collection wave; the wave never eats them.
+
+Big regulars unlock after 4 seconds, burnt after 8, and golden after 12. Until a
+type unlocks, its share becomes regular nuggets. The percentages in the table
+apply after the warm-up; rare big-golden spawns replace an ordinary throw.
+An eligible round gets one big golden between 18–42 seconds. Only 0.5% of those
+rounds get a second at 45–53 seconds: **0.09% of all rounds**, about 1 in 1,100.
+There are never more than two. Golden bonuses do not inflate the actual catch streak.
+
+The six-frame `assets/nuggets.png` atlas includes two regular shapes and the four
+special appearances. The active sprites were generated through the image API,
+then cropped, scaled and palette-reduced into crisp 32px frames. The original
+sheet and enlarged game-ready preview are retained at
+`art_sources/nuggets_v001.png` and `art_sources/nuggets_v001_pixel_preview.png`.
+The local generation tool remains available as an offline fallback.
 
 ### Difficulty and musical pace
 
@@ -99,8 +176,14 @@ location (`~/Library/Application Support/Godot/app_userdata/Nugget Cat/`).
 | `tools/compose_music.py` | Four additional compositions, MIDI sources and matching finale layers |
 | `tools/check_audio.py` | Checks music format, headroom, loop boundaries and matching stem durations |
 | `tools/generate_ai_hands.py` | One OpenAI Image API request; reads `OPENAI_API_KEY` from the environment |
+| `tools/generate_ai_art.py` | Shared API generator for hand and cat sheets; one candidate per request |
 | `tools/prompts/hands.txt` | Art direction and pose/layout prompt |
+| `tools/prompts/cat.txt` | Eight cat expressions and source color-role instructions |
 | `tools/prepare_hands.gd` | Offline cleanup, 14-color palette reduction and wrist alignment |
+| `tools/prepare_cat.gd` | Offline cat alignment, semantic index map, palette preview and app icon |
+| `tools/generate_nugget_sprites.gd` | Local six-frame nugget art for offline playtests |
+| `tools/prepare_nuggets.gd` | Convert the API nugget sheet into the same game atlas |
+| `tools/test_nuggets.gd` | Multi-chomp, hazard, buff, sweep and probability integration checks |
 | `art_sources/` | Generated source, request metadata and enlarged sprite preview; ignored by Godot |
 | `tools/fetch_template.py` | Fetch matching macOS template into this project using HTTP byte ranges |
 | `tools/preview.gd` | Render five actual game screens for inspection |
@@ -108,6 +191,28 @@ location (`~/Library/Application Support/Godot/app_userdata/Nugget Cat/`).
 | `build/` | App, zip, export template, and preview screenshots; ignored by Godot |
 
 ## Development commands
+
+### Persistent image API credentials on macOS
+
+Store the key once in macOS Keychain. Run this helper in your terminal:
+
+```sh
+python3 tools/setup_api_key.py
+```
+
+Paste your complete OpenAI API key at the hidden prompt. The helper writes through
+the native Keychain API and verifies an exact read-back, avoiding possible length
+limits in the `security` CLI's interactive password prompt. The key never appears
+in command arguments or shell history. Image-generation tools first
+check `OPENAI_API_KEY`, then this Keychain entry. The key stays outside the project
+and persists across terminal/OpenCode restarts. To confirm availability without
+displaying the key or making a billed request:
+
+```sh
+python3 tools/generate_ai_art.py --check-key
+```
+
+### Build and asset commands
 
 Run from this project folder:
 
@@ -118,6 +223,9 @@ python3 tools/generate_assets.py
 # Recreate the game hand sheet from the retained AI source (offline, no API call).
 /Applications/Godot.app/Contents/MacOS/Godot --headless --path . --script tools/prepare_hands.gd
 
+# Recreate the indexed cat atlas, preview and icon from the retained AI source.
+/Applications/Godot.app/Contents/MacOS/Godot --headless --path . --script tools/prepare_cat.gd
+
 # Check generated music files.
 python3 tools/check_audio.py
 
@@ -126,6 +234,9 @@ python3 tools/check_audio.py
 
 # Run deterministic behavior checks without changing saved scores/settings.
 /Applications/Godot.app/Contents/MacOS/Godot --headless --path . -- --smoke-test
+
+# Verify special nugget mechanics and spawn distributions.
+/Applications/Godot.app/Contents/MacOS/Godot --headless --path . --script tools/test_nuggets.gd
 
 # Render screenshots (requires graphical session).
 mkdir -p build/previews
@@ -166,9 +277,15 @@ To request another candidate (this makes a billed API request):
 
 ```sh
 python3 tools/generate_ai_hands.py --name hands_v002
+python3 tools/generate_ai_art.py --asset cat --name cat_v002
+python3 tools/generate_ai_art.py --asset nuggets
+# After inspecting the generated nugget source:
+/Applications/Godot.app/Contents/MacOS/Godot --headless --path . --script tools/prepare_nuggets.gd
 ```
 
 The generator never stores the API key. New candidates do not replace the active
 sprites automatically; `tools/prepare_hands.gd` records the selected source and
-its wrist anchors. An enlarged first-candidate preview is available at
-`art_sources/hands_v001_pixel_preview.png`.
+its wrist anchors, and `tools/prepare_cat.gd` records cat frame alignment. The
+v0.9 cat sheet also used `gpt-image-2.5-flare`. Source PNGs, prompts and non-secret
+request metadata are retained for both assets. Enlarged previews are available
+in `art_sources/`.

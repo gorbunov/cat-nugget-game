@@ -1,0 +1,25 @@
+Create an exceptionally cute, expressive, professional 16-bit PIXEL ART cat animation sprite sheet for a playful 2D arcade game called Nugget Cat. The cat catches flying chicken nuggets with its mouth. This is game production art, not a painting of a sprite sheet.
+
+CANVAS / LAYOUT:
+Transparent PNG, 1536x1024 pixels. EXACTLY EIGHT full-body cat sprites in a regular 4-COLUMN by 2-ROW grid. Each invisible cell is 384 wide x 512 high. No drawn grid, labels, lettering, text, food, scenery, floor, shadows, accessories or sparkles outside the cats. Each cat is centered in its cell and entirely separate, with transparent gutters. All sprites have EXACTLY the same scale, proportions, head position, paws baseline, and lighting. Each cat should occupy roughly 300 pixels wide and 330 pixels high within its cell.
+
+CHARACTER:
+The SAME front-facing chubby kitten in every frame: huge round head, little triangular ears with pink insides, big sparkling expressive eyes, a tiny pink triangular nose, pudgy little belly, tiny front paws at the bottom, a short fluffy tail curving to the viewer's right. Friendly rounded silhouette and mischievous personality. The face should dominate; the small body is still visible. Simple forehead tabby marks. Two short whiskers on each cheek. Appealing, confident anatomy and coherent consistent expressions. No clothes. All four feet may be simplified into two visible front paws and a sitting body.
+
+PIXEL ART STYLE:
+Design as genuine low-resolution 64x64 game sprites enlarged using crisp nearest-neighbor square pixels. Chunky, intentional pixel clusters and stepped outlines. Flat cel shading with 3 fur tones, 2 belly tones, 2 eye tones. Avoid photorealism, glossy 3D, smooth gradients, fuzz, semi-transparent fringes, tiny detail and excessive dithering. Bold dark outlines, warm cozy retro-game charm. Readable even when displayed very small.
+
+COLOR ROLES (IMPORTANT FOR LATER PALETTE SWAPPING):
+Use a COOL NEUTRAL SLATE-GRAY coat, clearly gray rather than brown: fur shadow #596375, midtone #909CAC, highlight #BCC5D1. Use WARM CREAM (#F3DCAB, shadow #D5B885) only for the belly and muzzle. Dark plum-black #302736 for outlines, pupils, mouth cavity and tabby stripes. Bright TURQUOISE irises #55CDBA with pale mint #A5EEE0 highlights; dark vertical pupils and tiny pure white shine dots. Use rose PINK (#E889A6, shadow #BD647E) for nose, blush, inner ears and tongue. WHITE #FFFFFF for eye glints and tiny teeth. Keep the role colors distinct; no random colorful patches. We will replace these role colors with orange, white, black, lavender and other fur palettes later.
+
+EIGHT FRAMES, LEFT TO RIGHT, TOP ROW THEN BOTTOM ROW:
+0 TOP LEFT — IDLE: alert, adorable, both eyes open, small relaxed closed mouth, anticipating food.
+1 TOP SECOND — BLINK: identical pose, eyes gently shut as short curved lines, closed mouth.
+2 TOP THIRD — CHOMP: mouth opened wide in a big joyful rounded O to catch a nugget; show a dark mouth cavity, little pink tongue and two tiny white teeth. Both eyes open. Keep the mouth's center in the same location as idle.
+3 TOP RIGHT — CHEW: mouth closed, cheeks comically puffed full of food, happy eyes open. No food visible.
+4 BOTTOM LEFT — HAPPY: very pleased, happy open eyes and a small smile, slightly raised little paws.
+5 BOTTOM SECOND — OFFENDED: eyebrows lowered, narrow open eyes (not completely closed), mouth in a tiny pout. Cute grumpy cat, not frightening.
+6 BOTTOM THIRD — WILD COMBO: hilariously enormous open eyes with tiny vertical pupils, huge delighted open mouth, tiny teeth and pink tongue. A comically overexcited cat, same pose and body shape.
+7 BOTTOM RIGHT — SLEEPY: eyes closed, cozy content face, mouth closed, same upright sitting pose (not curled up or lying down).
+
+Every frame is the SAME kitten and the same camera. Maintain outline thickness and consistent anatomy. Keep facial features and mouth position aligned so this sheet can be animated smoothly. No additional frames or duplicates.

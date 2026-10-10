@@ -1,0 +1,18 @@
+Create a professional PIXEL ART food sprite sheet for a cute 2D arcade game called Nugget Cat.
+
+CRITICAL LAYOUT: transparent PNG canvas 1536x1024. EXACTLY SIX separate chicken nugget sprites, arranged in a 3-COLUMN by 2-ROW grid. Each invisible cell is 512x512. One sprite centered at (256,256) inside each cell, with generous transparent space. Each sprite occupies about 320x260 source pixels. Same scale, consistent camera and lighting. No text, numbers, labels, borders, grid lines, plate, utensils, hands, cat, ground, cast shadows, aura, particles or background. Do not draw a transparency checkerboard.
+
+ART STYLE: genuinely chunky low-resolution 32x32 pixel sprites, displayed enlarged with sharp square pixels and deliberate stepped contours. Clear dark brown/plum 1-pixel-equivalent outline. Limited coherent warm palette, 3-4 main food colors, simple cel shading. Tiny groups of breading flakes, not photographic texture or smooth gradients. Each should remain recognizable at just 20 actual game pixels. Cozy 16-bit game art.
+
+THE FOOD MUST READ AS CHICKEN NUGGETS, NOT POTATOES:
+Recognizable flattened, breaded fast-food chicken nuggets. Irregular boot / bell / angular rectangular shapes, craggy scalloped edges, a few coarse crispy breading clusters, golden-brown top and darker toasted rim. Wide and flattened rather than spherical. Subtle top and side plane suggest thinness. No potato eyes, no round potato silhouette, no smiley faces, no fries, no chicken drumsticks, no croquettes, no exposed raw meat. No bite marks yet. Use broad readable shapes, not small noisy speckles.
+
+SIX TYPES, LEFT TO RIGHT, TOP ROW THEN BOTTOM ROW:
+0 TOP LEFT — REGULAR BOOT NUGGET. Warm amber-orange crispy breading, a clearly asymmetric flattened boot shape with a short protruding toe and a slightly notched opposite edge. Toasted brown outline and side rim, pale golden crunchy clusters on top.
+1 TOP MIDDLE — REGULAR BELL NUGGET. Same breading and colors, a squat flattened bell/trapezoid shape with one rounded bump and an irregular scalloped base. Clearly distinct silhouette from the first nugget, but same food.
+2 TOP RIGHT — BIG REGULAR NUGGET. A broader, thick, irregular roughly rectangular chicken nugget with two lumpy corners, extra chunky breading, deeper toasted side rim. Same edible amber-orange palette as regular nuggets, absolutely not metallic yellow. It will be displayed larger in the game and takes three chomps.
+3 BOTTOM LEFT — BURNT NUGGET. The same breaded chicken food but unmistakably burned BLACK / DARK CHARCOAL, with a few dark rust-red cracks and gray charred breading chips. A jagged flattened nugget silhouette. Mostly very dark, not ordinary brown. No fire, no smoke (the game will add smoke), no face.
+4 BOTTOM MIDDLE — GOLDEN NUGGET. A special edible chicken nugget, in brilliant rich yellow-gold rather than orange-brown. Angular shiny golden facets among crispy breading shapes, one small white specular highlight, a darker ochre side rim. An irregular flattened nugget, NOT a gold bar, coin or jewel. No external sparkles or halo (the game adds these).
+5 BOTTOM RIGHT — BIG GOLDEN NUGGET. A broad thick treasure-like golden chicken nugget with a distinctive irregular crown-like three-lobed top edge. Brilliant yellow-gold faceted breading, golden side rim, two little white highlights. Recognizably the same food family as the others, not a literal crown or gold ingot. No separate crown, particles or aura.
+
+Prioritize silhouettes, coarse crispy breading and obvious distinctions between warm edible brown, black burnt, and brilliant yellow gold. Keep all six isolated on true transparent backgrounds.

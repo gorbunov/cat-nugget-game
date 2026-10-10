@@ -1,0 +1,9 @@
+{
+  "texture": "res://assets/cat_indexed.png",
+  "frame_size": [64, 64],
+  "frame_count": 8,
+  "draw_size": [48, 48],
+  "mouth_anchor": [32, 35],
+  "frames": ["idle", "blink", "chomp", "chew", "happy", "offended", "wild", "sleepy"],
+  "roles": ["transparent", "outline", "fur_shadow", "fur", "fur_light", "belly_shadow", "belly", "iris", "iris_light", "accent", "accent_shadow", "white"]
+}

@@ -5,6 +5,7 @@ import random
 import struct
 import wave
 import zlib
+import sys
 from compose_music import compose_all, warm_filter
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -185,6 +186,7 @@ glyphs = {
 '>':['100','010','001','001','001','010','100'], '<':['001','010','100','100','100','010','001'],
 ' ':['000']*7,
 "'":['1','1','0','0','0','0','0'],
+'%':['11001','11010','00100','00100','01000','10110','00110'],
 }
 font_image = Image(16*8, 6*10)
 lines = ['info face="SnackPixel" size=8 bold=0 italic=0 charset="" unicode=1 stretchH=100 smooth=0 aa=1 padding=0,0,0,0 spacing=1,1', 'common lineHeight=10 base=8 scaleW=128 scaleH=60 pages=1 packed=0', 'page id=0 file="pixel_font.png"', f'chars count={len(glyphs)}']
@@ -198,6 +200,10 @@ for i, (char, pattern) in enumerate(glyphs.items()):
     lines.append(f'char id={ord(char)} x={x} y={y} width={w} height=7 xoffset=0 yoffset=0 xadvance={w+1} page=0 chnl=15')
 font_image.png('pixel_font.png')
 (ASSETS/'pixel_font.fnt').write_text('\n'.join(lines)+'\n')
+
+if '--art-only' in sys.argv:
+    print(f'Generated procedural art and bitmap font in {ASSETS}')
+    sys.exit(0)
 
 SR = 22050
 random.seed(24)

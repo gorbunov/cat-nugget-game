@@ -1,0 +1,73 @@
+{
+  "defaults": {
+    "outline": "302736",
+    "fur_shadow": "596375",
+    "fur": "909cac",
+    "fur_light": "bcc5d1",
+    "belly_shadow": "d5b885",
+    "belly": "f3dcab",
+    "iris": "55cdba",
+    "iris_light": "a5eee0",
+    "accent": "ee8ba5",
+    "accent_shadow": "bd647e",
+    "white": "fff9ee"
+  },
+  "palettes": [
+    {
+      "name": "GINGER",
+      "colors": {
+        "fur_shadow": "ba713f", "fur": "f0974a", "fur_light": "ffc370",
+        "belly_shadow": "e5be87", "belly": "ffe7b8",
+        "iris": "68b87b", "iris_light": "b6e3a1"
+      }
+    },
+    {
+      "name": "SNOW",
+      "colors": {
+        "fur_shadow": "b0bfce", "fur": "e1e8ed", "fur_light": "ffffff",
+        "belly_shadow": "c8d4df", "belly": "f1f5f4",
+        "iris": "63a9dc", "iris_light": "b1dffd"
+      }
+    },
+    {
+      "name": "SILVER",
+      "colors": {
+        "fur_shadow": "505d72", "fur": "8291a9", "fur_light": "b0bdd0",
+        "belly_shadow": "b4bfce", "belly": "e2e7ef",
+        "iris": "4ebaa8", "iris_light": "a6ead7"
+      }
+    },
+    {
+      "name": "COCOA",
+      "colors": {
+        "fur_shadow": "714937", "fur": "ab7958", "fur_light": "d5a883",
+        "belly_shadow": "cba57e", "belly": "f3d8b5",
+        "iris": "cc913b", "iris_light": "f6d586"
+      }
+    },
+    {
+      "name": "LAVENDER",
+      "colors": {
+        "fur_shadow": "786199", "fur": "ad95d0", "fur_light": "d4bfee",
+        "belly_shadow": "c4addd", "belly": "ede0fa",
+        "iris": "d5ab43", "iris_light": "f5df94"
+      }
+    },
+    {
+      "name": "MINT",
+      "colors": {
+        "fur_shadow": "488a7f", "fur": "80c2aa", "fur_light": "b8e2c9",
+        "belly_shadow": "b4d3b0", "belly": "e1f4d6",
+        "iris": "528fc5", "iris_light": "a5d2f0"
+      }
+    },
+    {
+      "name": "CHARCOAL",
+      "colors": {
+        "fur_shadow": "252a33", "fur": "414754", "fur_light": "666f80",
+        "belly_shadow": "646b77", "belly": "969eaa",
+        "iris": "239c68", "iris_light": "71e0a1"
+      }
+    }
+  ]
+}

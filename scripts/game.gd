@@ -11,6 +11,16 @@ const DIFFICULTY_STAGES := [
 	Vector4(60, 0.30, 0.68, 1.20),
 ]
 const CATCH_RADIUS := 18.0
+const CHOMP_INTERVAL := 0.20
+const BIG_GOLD_ROUND_CHANCE := 0.18
+const SECOND_BIG_GOLD_CHANCE := 0.005
+const NUGGET_TYPES := {
+	"regular": {"frame": 0, "hp": 1, "size": 20.0, "points": 10, "radius": 18.0, "chance": 70, "unlock": 0},
+	"big": {"frame": 2, "hp": 3, "size": 35.0, "points": 30, "radius": 25.0, "chance": 15, "unlock": 4},
+	"burnt": {"frame": 3, "hp": 1, "size": 21.0, "points": 0, "radius": 16.0, "chance": 11, "unlock": 8},
+	"golden": {"frame": 4, "hp": 1, "size": 23.0, "points": 20, "radius": 19.0, "chance": 4, "unlock": 12},
+	"big_golden": {"frame": 5, "hp": 3, "size": 38.0, "points": 100, "radius": 27.0, "chance": BIG_GOLD_ROUND_CHANCE * 100},
+}
 const HAND_GRIPS := [Vector2(17, -5), Vector2(12, -15), Vector2(24, -9)]
 const INK := Color("423044")
 const CREAM := Color("fff0cd")
@@ -26,18 +36,12 @@ const TRACKS := [
 	{"name": "NUGGET QUEST", "mood": "A TINY CAT. A GRAND ADVENTURE.", "file": "nugget_quest", "panic": "nugget_quest_panic"},
 	{"name": "NUGGET BATTLE", "mood": "BOSS-FIGHT DRUMS AND DRIVING BASS", "file": "nugget_battle", "panic": "nugget_battle_panic"},
 ]
-const CAT_PALETTES := [
-	{"name": "GINGER", "fur": Color("f0974a"), "light": Color("ffc370"), "belly": Color("ffe7b8"), "eyes": Color("82c98f")},
-	{"name": "SNOW", "fur": Color("bccbd6"), "light": Color("edf3ef"), "belly": Color("ffffff"), "eyes": Color("77bde8")},
-	{"name": "SILVER", "fur": Color("68768b"), "light": Color("a4b1c6"), "belly": Color("e2e7ef"), "eyes": Color("75d2c5")},
-	{"name": "COCOA", "fur": Color("946348"), "light": Color("c49370"), "belly": Color("f3d8b5"), "eyes": Color("e9b85c")},
-	{"name": "LAVENDER", "fur": Color("9981bf"), "light": Color("cbb3ea"), "belly": Color("ede0fa"), "eyes": Color("edc96b")},
-	{"name": "MINT", "fur": Color("64aa98"), "light": Color("a6dcc0"), "belly": Color("e1f4d6"), "eyes": Color("69aade")},
-	{"name": "CHARCOAL", "fur": Color("30333d"), "light": Color("575b68"), "belly": Color("9295a0"), "eyes": Color("eec55e")},
-]
+const CatAppearance := preload("res://scripts/cat_appearance.gd")
 
-var cat_tex: Texture2D = preload("res://assets/cat.png")
-var nugget_tex: Texture2D = preload("res://assets/nugget.png")
+var cat_art := CatAppearance.new()
+var cat_palettes: Array[Dictionary] = []
+var cat_tex: Texture2D
+var nugget_tex: Texture2D = preload("res://assets/nuggets.png")
 var hand_tex: Texture2D = preload("res://assets/hands_ai.png")
 var font: Font = preload("res://assets/pixel_font.fnt")
 var music: AudioStreamPlayer
@@ -47,6 +51,7 @@ var sounds: Dictionary = {}
 var state := "title"
 var previous_state := "title"
 var clock := 0.0
+var results_time := 0.0
 var remaining := ROUND_LENGTH
 var spawn_in := 0.9
 var cat := Vector2(320, 180)
@@ -59,6 +64,12 @@ var score := 0
 var catches := 0
 var misses := 0
 var throws := 0
+var burnt_eaten := 0
+var golden_bonus := 0
+var rare_spawn_times: Array[float] = []
+var sweep_pending := false
+var sweep_time := 0.0
+var sweep_origin := Vector2.ZERO
 var streak := 0
 var longest := 0
 var best := 0
@@ -70,7 +81,6 @@ var shuffle_music := true
 var cat_palette := 0
 var cat_name_index := -1
 var title_cat_selected := false
-var cat_textures: Array[Texture2D] = []
 var fullscreen := false
 var windowed_size := Vector2i(1280, 720)
 var windowed_position := Vector2i.ZERO
@@ -91,8 +101,11 @@ func _ready() -> void:
 	var smoke_requested := "--smoke-test" in OS.get_cmdline_user_args()
 	test_mode = test_mode or smoke_requested
 	_load_settings()
-	_build_cat_palettes()
-	_select_cat(_random_choice(-1, CAT_PALETTES.size()))
+	if cat_art.load_assets() != OK:
+		get_tree().quit(1)
+		return
+	cat_palettes = cat_art.palettes
+	_select_cat(_random_choice(-1, cat_palettes.size()))
 	windowed_size = get_window().size
 	windowed_position = get_window().position
 	if fullscreen and not test_mode:
@@ -122,52 +135,9 @@ func _random_choice(current: int, count: int) -> int:
 		return random.randi_range(0, count - 1)
 	return (current + random.randi_range(1, count - 1)) % count
 
-func _build_cat_palettes() -> void:
-	var source := cat_tex.get_image()
-	if source.is_compressed():
-		source.decompress()
-	for palette in CAT_PALETTES:
-		var image := source.duplicate() as Image
-		var replacements := {
-			Color("f0974a").to_rgba32(): palette.fur,
-			Color("ffc370").to_rgba32(): palette.light,
-			Color("ffe7b8").to_rgba32(): palette.belly,
-		}
-		for y in range(image.get_height()):
-			for x in range(image.get_width()):
-				var pixel := source.get_pixel(x, y).to_rgba32()
-				if replacements.has(pixel):
-					image.set_pixel(x, y, replacements[pixel])
-		_color_cat_eyes(image, palette.eyes)
-		cat_textures.append(ImageTexture.create_from_image(image))
-
-func _color_cat_eyes(image: Image, color: Color) -> void:
-	# Paint only iris pixels inside the eye shapes, never shared outline colors.
-	# Preserve the dark vertical pupil and the sprite's original white glints.
-	for frame in [0, 2, 3, 4]:
-		for center in [17, 32]:
-			for y in range(22, 27):
-				for dx in range(-2, 3):
-					if dx != 0 and dx * dx / 4.0 + pow((y - 24) / 2.5, 2) <= 1:
-						_iris_pixel(image, Vector2i(frame * 48 + center + dx, y), color)
-	# Narrow, offended eyes stay below the angry eyebrows.
-	for x in [15, 17, 31, 33]:
-		for y in range(24, 27):
-			_iris_pixel(image, Vector2i(5 * 48 + x, y), color)
-	# Wild eyes have offset pupils; preserve the surrounding whites.
-	for pupil in [Vector2i(18, 19), Vector2i(30, 21)]:
-		for y in range(pupil.y + 1, pupil.y + 7):
-			for dx in [-1, 1]:
-				_iris_pixel(image, Vector2i(6 * 48 + pupil.x + dx, y), color)
-	# Blink and sleeping frames intentionally have no visible irises.
-
-func _iris_pixel(image: Image, position: Vector2i, color: Color) -> void:
-	if image.get_pixelv(position).to_rgba32() == Color("422b3e").to_rgba32():
-		image.set_pixelv(position, color)
-
 func _select_cat(index: int) -> void:
 	cat_palette = index
-	cat_tex = cat_textures[index]
+	cat_tex = cat_art.texture_for_palette(index)
 	cat_name_index = _random_choice(cat_name_index, CAT_NAMES.size())
 
 func _select_track(index: int) -> void:
@@ -289,7 +259,7 @@ func _input(event: InputEvent) -> void:
 				_pause()
 			elif state == "paused":
 				_resume()
-			elif state == "settings":
+			elif state in ["settings", "guide"]:
 				_close_settings()
 		elif event.keycode == KEY_ENTER or event.keycode == KEY_SPACE:
 			if state in ["title", "results"]:
@@ -318,7 +288,7 @@ func _action(action: String) -> void:
 			Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
 		"cat_shuffle":
 			if state == "title":
-				_select_cat(_random_choice(cat_palette, CAT_PALETTES.size()))
+				_select_cat(_random_choice(cat_palette, cat_palettes.size()))
 				title_cat_selected = true
 				expression = 0.42
 		"settings":
@@ -327,6 +297,9 @@ func _action(action: String) -> void:
 			_set_music_rate(1.0)
 			music.stream_paused = false
 			panic_music.stop()
+		"guide":
+			previous_state = state
+			state = "guide"
 		"back": _close_settings()
 		"fullscreen": _toggle_fullscreen()
 		"track_prev", "track_next":
@@ -352,7 +325,7 @@ func _start() -> void:
 	remaining = ROUND_LENGTH
 	_set_music_rate(1.0)
 	if not title_cat_selected:
-		_select_cat(_random_choice(cat_palette, CAT_PALETTES.size()))
+		_select_cat(_random_choice(cat_palette, cat_palettes.size()))
 	title_cat_selected = false
 	if shuffle_music:
 		_select_track(_random_choice(selected_track, TRACKS.size()))
@@ -360,6 +333,11 @@ func _start() -> void:
 	catches = 0
 	misses = 0
 	throws = 0
+	burnt_eaten = 0
+	golden_bonus = 0
+	sweep_pending = false
+	sweep_time = 0.0
+	_plan_rare_spawns()
 	streak = 0
 	longest = 0
 	old_best = best
@@ -371,7 +349,7 @@ func _start() -> void:
 	particles.clear()
 	popups.clear()
 	buttons.clear()
-	cat = get_global_mouse_position().clamp(Vector2(20, 62), Vector2(620, 334))
+	cat = get_global_mouse_position().clamp(Vector2(20, 62), Vector2(620, 326))
 	cat_previous = cat
 	cat_velocity = Vector2.ZERO
 	banner = "FOLLOW YOUR APPETITE!"
@@ -393,7 +371,7 @@ func _pause() -> void:
 func _resume() -> void:
 	state = "playing"
 	_set_music_rate(_difficulty_at(ROUND_LENGTH - remaining).z)
-	cat = get_global_mouse_position().clamp(Vector2(20, 62), Vector2(620, 334))
+	cat = get_global_mouse_position().clamp(Vector2(20, 62), Vector2(620, 326))
 	cat_previous = cat
 	music.stream_paused = false
 	if remaining <= 10:
@@ -403,6 +381,8 @@ func _resume() -> void:
 
 func _finish() -> void:
 	state = "results"
+	results_time = 0.0
+	expression = 0.0
 	remaining = 0
 	best = maxi(best, score)
 	_save_settings()
@@ -418,13 +398,15 @@ func _process(delta: float) -> void:
 	clock += delta
 	if state == "playing":
 		cat_previous = cat
-		cat = get_global_mouse_position().clamp(Vector2(20, 62), Vector2(620, 334))
+		cat = get_global_mouse_position().clamp(Vector2(20, 62), Vector2(620, 326))
 		var velocity := (cat - cat_previous) / maxf(delta, 0.001)
 		cat_velocity = cat_velocity.lerp(velocity, 1.0 - exp(-12 * delta))
 		tilt = lerpf(tilt, clampf(cat_velocity.x / 2200, -0.24, 0.24), 1.0 - exp(-14 * delta))
 		_step(delta)
 	elif state == "title":
 		expression = maxf(0, expression - delta)
+	elif state == "results":
+		results_time += delta
 	queue_redraw()
 
 func _step(delta: float) -> void:
@@ -437,6 +419,7 @@ func _step(delta: float) -> void:
 	expression = maxf(0, expression - delta)
 	offended = maxf(0, offended - delta)
 	banner_time = maxf(0, banner_time - delta)
+	sweep_time = maxf(0, sweep_time - delta)
 	if remaining <= 10 and last_second > 10:
 		banner = "SNACK PANIC!"
 		banner_time = 1.6
@@ -462,16 +445,21 @@ func _step(delta: float) -> void:
 		var n: Dictionary = nuggets[i]
 		var before: Vector2 = n.pos
 		n.age += delta
+		n.bite_wait = maxf(0, n.bite_wait - delta)
 		n.vel.y += n.gravity * delta
 		n.pos += n.vel * delta
 		n.rotation += n.spin * delta
 		# Swept relative motion prevents tunneling during fast mouse swipes.
-		if _swept_catch(before, n.pos, cat_previous, cat):
-			_catch(n.pos)
-			nuggets.remove_at(i)
+		if _swept_catch(before, n.pos, cat_previous, cat, NUGGET_TYPES[n.kind].radius):
+			if _chomp(n):
+				nuggets.remove_at(i)
+				_eat_nugget(n)
 		elif n.pos.x < -24 or n.pos.x > 664 or n.pos.y > 390 or n.pos.y < -100:
-			_miss()
+			if n.kind != "burnt":
+				_miss()
 			nuggets.remove_at(i)
+	if sweep_pending:
+		_collect_flying_nuggets()
 	for i in range(particles.size() - 1, -1, -1):
 		var p: Dictionary = particles[i]
 		p.life -= delta
@@ -485,10 +473,30 @@ func _step(delta: float) -> void:
 		if popups[i].life <= 0:
 			popups.remove_at(i)
 
-func _swept_catch(n0: Vector2, n1: Vector2, c0: Vector2, c1: Vector2) -> bool:
+func _swept_catch(n0: Vector2, n1: Vector2, c0: Vector2, c1: Vector2, radius: float = CATCH_RADIUS) -> bool:
 	var start := n0 - c0
 	var end := n1 - c1
-	return Geometry2D.get_closest_point_to_segment(Vector2.ZERO, start, end).length_squared() <= CATCH_RADIUS * CATCH_RADIUS
+	return Geometry2D.get_closest_point_to_segment(Vector2.ZERO, start, end).length_squared() <= radius * radius
+
+func _plan_rare_spawns() -> void:
+	rare_spawn_times.clear()
+	if random.randf() < BIG_GOLD_ROUND_CHANCE:
+		rare_spawn_times.append(random.randf_range(18, 42))
+		if random.randf() < SECOND_BIG_GOLD_CHANCE:
+			rare_spawn_times.append(random.randf_range(45, 53))
+
+func _next_nugget_kind() -> String:
+	var elapsed := ROUND_LENGTH - remaining
+	if not rare_spawn_times.is_empty() and elapsed >= rare_spawn_times[0]:
+		rare_spawn_times.remove_at(0)
+		return "big_golden"
+	var roll := random.randf()
+	var threshold := 0.0
+	for kind in ["big", "burnt", "golden"]:
+		threshold += NUGGET_TYPES[kind].chance / 100.0
+		if roll < threshold:
+			return kind if elapsed >= NUGGET_TYPES[kind].unlock else "regular"
+	return "regular"
 
 func _spawn_hand() -> void:
 	var edge := random.randi_range(0, 2)
@@ -503,23 +511,85 @@ func _spawn_hand() -> void:
 	else:
 		position = Vector2(random.randf_range(120, 520), 66)
 		angle = PI / 2
-	hands.append({"pos": position, "angle": angle, "age": 0.0, "released": false, "edge": edge})
+	var kind := _next_nugget_kind()
+	hands.append({"pos": position, "angle": angle, "age": 0.0, "released": false, "edge": edge, "kind": kind, "variant": random.randi_range(0, 1) if kind == "regular" else 0})
+	if kind == "big_golden":
+		banner = "RARE BIG GOLDEN! THREE CHOMPS!"
+		banner_time = 1.5
+		_sound("combo", 0.85)
 
 func _release(hand: Dictionary) -> void:
 	throws += 1
 	var origin: Vector2 = hand.pos + HAND_GRIPS[2].rotated(hand.angle)
+	var kind: String = hand.get("kind", "regular")
 	var target := Vector2(random.randf_range(210, 430), random.randf_range(160, 270))
 	var flight := _difficulty_at(ROUND_LENGTH - remaining).y
+	if NUGGET_TYPES[kind].hp == 3:
+		flight *= 1.18
 	var gravity := 155.0
 	var velocity := (target - origin) / flight - Vector2(0, gravity * flight * 0.5)
-	nuggets.append({"pos": origin, "vel": velocity, "gravity": gravity, "age": 0.0, "rotation": random.randf_range(-PI, PI), "spin": random.randf_range(-5, 5)})
+	nuggets.append(_make_nugget(kind, origin, velocity, gravity, hand.get("variant", 0)))
 	_sound("throw", random.randf_range(0.85, 1.2))
 
-func _multiplier() -> int:
-	return mini(5, 1 + floori(streak / 5.0))
+func _make_nugget(kind: String, position: Vector2, velocity: Vector2 = Vector2.ZERO, gravity: float = 155.0, variant: int = 0) -> Dictionary:
+	return {"kind": kind, "variant": variant, "hp": NUGGET_TYPES[kind].hp, "bite_wait": 0.0,
+		"pos": position, "vel": velocity, "gravity": gravity, "age": 0.0,
+		"rotation": random.randf_range(-PI, PI), "spin": random.randf_range(-3, 3)}
 
-func _catch(position: Vector2) -> void:
-	var earned := 10 * _multiplier()
+func _chomp(nugget: Dictionary) -> bool:
+	if nugget.bite_wait > 0:
+		return false
+	nugget.hp -= 1
+	if nugget.hp == 0:
+		return true
+	nugget.bite_wait = CHOMP_INTERVAL
+	nugget.vel *= 0.72
+	expression = 0.34
+	_sound("catch", 0.7 + (3 - nugget.hp) * 0.1)
+	popups.append({"pos": nugget.pos + Vector2(0, -29), "text": "%d CHOMPS LEFT" % nugget.hp, "life": 0.4, "color": CREAM})
+	return false
+
+func _eat_nugget(nugget: Dictionary, allow_sweep: bool = true) -> void:
+	var kind: String = nugget.kind
+	if kind == "burnt":
+		var penalty := mini(30, score)
+		score -= penalty
+		burnt_eaten += 1
+		streak = 0
+		golden_bonus = 0
+		expression = 0
+		offended = 1.0
+		_sound("miss", 0.7)
+		popups.append({"pos": nugget.pos + Vector2(0, -28), "text": "YUCK! -%d" % penalty, "life": 1.0, "color": PINK})
+		return
+	_catch(nugget.pos, NUGGET_TYPES[kind].points)
+	if kind == "golden":
+		golden_bonus = mini(4, golden_bonus + 1)
+		banner = "GOLDEN BOOST! X%d" % _multiplier()
+		banner_time = 1.3
+		_sound("combo")
+	elif kind == "big_golden" and allow_sweep:
+		sweep_pending = true
+		sweep_origin = nugget.pos
+
+func _collect_flying_nuggets() -> void:
+	# Deferred until the collision pass ends: never mutate the active iteration.
+	sweep_pending = false
+	sweep_time = 0.65
+	for i in range(nuggets.size() - 1, -1, -1):
+		if nuggets[i].kind != "burnt":
+			var nugget: Dictionary = nuggets[i]
+			nuggets.remove_at(i)
+			_eat_nugget(nugget, false)
+	banner = "GOLDEN FEAST! EDIBLES COLLECTED!"
+	banner_time = 1.8
+	_sound("finish", 1.1)
+
+func _multiplier() -> int:
+	return mini(5, 1 + floori(streak / 5.0) + golden_bonus)
+
+func _catch(position: Vector2, base_points: int = 10) -> void:
+	var earned := base_points * _multiplier()
 	score += earned
 	catches += 1
 	streak += 1
@@ -541,6 +611,7 @@ func _catch(position: Vector2) -> void:
 func _miss() -> void:
 	misses += 1
 	streak = 0
+	golden_bonus = 0
 	offended = 0.7
 	_sound("miss", 0.95)
 
@@ -569,6 +640,8 @@ func _button(label: String, rect: Rect2, action: String, primary: bool = false) 
 	buttons.append({"rect": rect, "action": action})
 
 func _draw() -> void:
+	if cat_tex == null:
+		return
 	buttons.clear()
 	_kitchen()
 	if state == "title":
@@ -577,17 +650,20 @@ func _draw() -> void:
 		_results()
 	elif state == "settings":
 		_settings()
+	elif state == "guide":
+		_nugget_guide()
 	else:
 		_playfield()
 		if state == "paused":
 			draw_rect(Rect2(0, 0, 640, 360), Color(0.16, 0.12, 0.20, 0.7))
-			_panel(Rect2(206, 81, 228, 219))
-			_text("SNACK BREAK", Vector2(320, 101), 16, GOLD, true)
-			_text("YOUR NUGGETS CAN WAIT.", Vector2(320, 131), 8, CREAM, true)
-			_button("KEEP MUNCHING", Rect2(240, 159, 160, 30), "resume", true)
-			_button("SETTINGS", Rect2(240, 199, 160, 26), "settings")
-			_button("BACK TO TITLE", Rect2(240, 235, 160, 26), "home")
-			_text("ESC TO RESUME", Vector2(320, 278), 8, MINT, true)
+			_panel(Rect2(206, 63, 228, 258))
+			_text("SNACK BREAK", Vector2(320, 85), 16, GOLD, true)
+			_text("YOUR NUGGETS CAN WAIT.", Vector2(320, 115), 8, CREAM, true)
+			_button("KEEP MUNCHING", Rect2(240, 141, 160, 30), "resume", true)
+			_button("SETTINGS", Rect2(240, 181, 160, 26), "settings")
+			_button("NUGGET GUIDE", Rect2(240, 215, 160, 26), "guide")
+			_button("BACK TO TITLE", Rect2(240, 249, 160, 26), "home")
+			_text("ESC TO RESUME", Vector2(320, 299), 8, MINT, true)
 
 func _kitchen() -> void:
 	draw_rect(Rect2(0, 0, 640, 360), Color("c9d9c6"))
@@ -633,13 +709,13 @@ func _kitchen() -> void:
 	for x in range(569, 594, 8):
 		draw_rect(Rect2(x, 302, 2, 44), Color("c1a899"))
 
-func _cat_sprite(position: Vector2, frame: int, scale_factor: float = 1.5, angle: float = 0.0) -> void:
+func _cat_sprite(position: Vector2, frame: int, scale_factor: float = 1.5, angle: float = 0.0, pose_scale: Vector2 = Vector2.ONE) -> void:
 	var stretch := 1.0 + minf(cat_velocity.length() / 10000, 0.14) if state == "playing" else 1.0
 	if expression > 0.30:
 		stretch += 0.10
-	draw_set_transform(position, angle, Vector2(scale_factor / stretch, scale_factor * stretch))
-	# Frame mouth center is (24,31); rotation/scaling pivot stays at catch position.
-	draw_texture_rect_region(cat_tex, Rect2(-24, -31, 48, 48), Rect2(frame * 48, 0, 48, 48))
+	draw_set_transform(position, angle, Vector2(scale_factor / stretch, scale_factor * stretch) * pose_scale)
+	# Atlas and mouth anchor come from sprite metadata; catch position stays stable.
+	draw_texture_rect_region(cat_tex, cat_art.draw_rect(), cat_art.frame_rect(frame))
 	draw_set_transform(Vector2.ZERO)
 
 func _cat_frame() -> int:
@@ -653,6 +729,37 @@ func _cat_frame() -> int:
 		return 1
 	return 6 if streak >= 15 else 0
 
+func _nugget_region(kind: String, variant: int = 0) -> Rect2:
+	var frame: int = NUGGET_TYPES[kind].frame + (variant if kind == "regular" else 0)
+	return Rect2(frame * 32, 0, 32, 32)
+
+func _draw_flying_nugget(n: Dictionary) -> void:
+	var kind: String = n.kind
+	var spec: Dictionary = NUGGET_TYPES[kind]
+	var size: float = spec.size * (1.0 - (spec.hp - n.hp) * 0.08)
+	var golden := kind in ["golden", "big_golden"]
+	if golden:
+		draw_circle(n.pos, size * 0.65, Color(1, 0.85, 0.25, 0.18))
+		for i in range(3 if kind == "big_golden" else 2):
+			var sparkle: Vector2 = n.pos + Vector2.RIGHT.rotated(clock * 2 + i * TAU / 3) * (size * 0.65)
+			draw_line(sparkle - Vector2(2, 0), sparkle + Vector2(2, 0), GOLD)
+			draw_line(sparkle - Vector2(0, 2), sparkle + Vector2(0, 2), GOLD)
+	draw_circle(n.pos + Vector2(3, 7), size * 0.38, Color(0.25, 0.22, 0.25, 0.12))
+	draw_set_transform(n.pos, n.rotation)
+	draw_texture_rect_region(nugget_tex, Rect2(Vector2.ONE * (-size / 2), Vector2.ONE * size), _nugget_region(kind, n.variant))
+	draw_set_transform(Vector2.ZERO)
+	if spec.hp == 3:
+		for i in range(3):
+			var dot: Vector2 = n.pos + Vector2((i - 1) * 7, -size / 2 - 5)
+			draw_rect(Rect2(dot - Vector2(2, 2), Vector2(5, 5)), INK)
+			draw_rect(Rect2(dot - Vector2.ONE, Vector2(3, 3)), GOLD if i < n.hp else Color("756475"))
+	elif kind == "burnt":
+		for i in range(2):
+			var smoke: Vector2 = n.pos + Vector2(sin(clock * 4 + i) * 4, -14 - fmod(clock * 12 + i * 8, 17))
+			draw_rect(Rect2(smoke, Vector2(3, 3)), Color(0.35, 0.28, 0.32, 0.45))
+		_text("X", n.pos + Vector2(10, -18), 8, INK, true)
+		_text("X", n.pos + Vector2(10, -19), 8, PINK, true)
+
 func _playfield() -> void:
 	for hand in hands:
 		var age: float = hand.age
@@ -662,16 +769,18 @@ func _playfield() -> void:
 		draw_set_transform(pos, hand.angle)
 		var frame := 0 if age < 0.4 else (1 if age < 0.72 else 2)
 		if not hand.released:
-			draw_texture_rect(nugget_tex, Rect2(HAND_GRIPS[frame] - Vector2(8, 8), Vector2(16, 16)), false)
+			var kind: String = hand.get("kind", "regular")
+			var held_size := 24.0 if NUGGET_TYPES[kind].hp == 3 else 16.0
+			draw_texture_rect_region(nugget_tex, Rect2(HAND_GRIPS[frame] - Vector2.ONE * held_size / 2, Vector2.ONE * held_size), _nugget_region(kind, hand.get("variant", 0)))
 		draw_texture_rect_region(hand_tex, Rect2(-32, -24, 64, 48), Rect2(frame * 64, 0, 64, 48))
 		draw_set_transform(Vector2.ZERO)
 		if not hand.released and age > 0.3:
 			_text("!", pos + direction * 43 + Vector2(0, -8), 16, INK, true)
 	for n in nuggets:
-		draw_circle(n.pos + Vector2(3, 7), 8, Color(0.25, 0.22, 0.25, 0.12))
-		draw_set_transform(n.pos, n.rotation)
-		draw_texture_rect(nugget_tex, Rect2(-10, -10, 20, 20), false)
-		draw_set_transform(Vector2.ZERO)
+		_draw_flying_nugget(n)
+	if sweep_time > 0:
+		var progress := 1.0 - sweep_time / 0.65
+		draw_arc(sweep_origin, lerpf(12, 650, progress), 0, TAU, 64, Color(1, 0.88, 0.4, (1 - progress) * 0.7), 3)
 	# Ground shadow and trailing paws communicate motion without input lag.
 	draw_set_transform(Vector2(cat.x, 294), 0, Vector2(1, 0.25))
 	draw_circle(Vector2.ZERO, 22, Color(0.2, 0.25, 0.23, 0.13))
@@ -699,6 +808,8 @@ func _hud() -> void:
 	_text("SNACK SCORE", Vector2(16, 8), 8, MINT)
 	_text("%05d" % score, Vector2(16, 23), 16)
 	_text("COMBO", Vector2(173, 8), 8, MINT)
+	if golden_bonus > 0:
+		_text("G+%d" % golden_bonus, Vector2(220, 10), 8, GOLD)
 	_text("X%d" % _multiplier(), Vector2(173, 24), 16, GOLD)
 	for i in range(5):
 		draw_rect(Rect2(219 + i * 7, 31, 5, 5), GOLD if i < streak % 5 or _multiplier() == 5 else Color("725866"))
@@ -708,7 +819,7 @@ func _hud() -> void:
 	_button("II", Rect2(588, 11, 34, 27), "pause")
 	# Bottom prompt sits on the counter.
 	_text("MOUSE TO MUNCH", Vector2(12, 345), 8, INK)
-	_text("%s / %s" % [CAT_NAMES[cat_name_index], CAT_PALETTES[cat_palette].name], Vector2(320, 345), 8, INK, true)
+	_text("%s / %s" % [CAT_NAMES[cat_name_index], cat_palettes[cat_palette].name], Vector2(320, 345), 8, INK, true)
 	_text("ESC: SNACK BREAK", Vector2(522, 345), 8, INK, true)
 
 func _title() -> void:
@@ -724,39 +835,83 @@ func _title() -> void:
 	draw_rect(portrait, Color("675367"))
 	draw_rect(Rect2(422, 81, 145, 132), MINT if hovered else Color("806678"), false, 2)
 	buttons.append({"rect": portrait, "action": "cat_shuffle"})
-	_cat_sprite(Vector2(495, 162 + sin(clock * 2.5) * 4), 6 if expression > 0 or fmod(clock, 5) > 4 else (1 if fmod(clock, 4) < 0.15 else 0), 2.8, sin(clock * 1.8) * 0.06)
+	_cat_sprite(Vector2(495, 151 + sin(clock * 2.5) * 4), 6 if expression > 0 or fmod(clock, 5) > 4 else (1 if fmod(clock, 4) < 0.15 else 0), 2.8, sin(clock * 1.8) * 0.06)
 	_text(CAT_NAMES[cat_name_index], Vector2(495, 223), 8, GOLD, true)
 	_text("CLICK TO MEET ANOTHER CAT", Vector2(495, 237), 8, MINT if hovered else CREAM, true)
 	draw_set_transform(Vector2(558, 88 + sin(clock * 3) * 4), clock * 0.7)
-	draw_texture_rect(nugget_tex, Rect2(-13, -13, 26, 26), false)
+	draw_texture_rect_region(nugget_tex, Rect2(-13, -13, 26, 26), _nugget_region("regular"))
 	draw_set_transform(Vector2.ZERO)
 	_text("MOVE YOUR MOUSE. CATCH THE NUGGETS.", Vector2(224, 205), 8, CREAM, true)
 	_text("60 SECONDS. ONE VERY HUNGRY CAT.", Vector2(224, 221), 8, MINT, true)
 	_button("LET'S EAT!", Rect2(100, 247, 245, 36), "start", true)
 	_button("SETTINGS", Rect2(366, 252, 105, 26), "settings")
 	_button("QUIT", Rect2(483, 252, 78, 26), "quit")
-	_text("BEST SNACK SCORE: %05d" % best, Vector2(320, 303), 8, GOLD, true)
+	_text("BEST SNACK SCORE: %05d" % best, Vector2(224, 303), 8, GOLD, true)
+	_button("NUGGET GUIDE + ODDS", Rect2(366, 293, 195, 24), "guide")
 	_text("ENTER: START  /  ESC: PAUSE  /  F11: FULLSCREEN", Vector2(320, 348), 8, INK, true)
+
+func _victory_dance() -> void:
+	var beat := results_time * 2.4
+	var bounce := sin(fmod(beat, 1.0) * PI)
+	var stretch := 1.0 + 0.07 * bounce - 0.09 * pow(1.0 - bounce, 4)
+	var mirror := -1.0 if floori(beat / 4) % 2 == 1 else 1.0
+	var position := Vector2(200 + sin(beat * PI * 0.5) * 6, 169 - 41 * stretch - bounce * 8)
+	var frames := [4, 3, 4, 6, 4, 1, 4, 2]
+	var frame: int = frames[floori(beat) % frames.size()]
+	# Grounding shadow shrinks on each hop; the feet squash back onto the stage.
+	draw_set_transform(Vector2(position.x, 171), 0, Vector2(1, 0.15))
+	draw_circle(Vector2.ZERO, 21 - bounce * 5, Color("302636"))
+	draw_set_transform(Vector2.ZERO)
+	for i in range(4):
+		var sparkle := Vector2(148 if i % 2 == 0 else 252, 111 + (i / 2) * 38)
+		sparkle.y += sin(beat * PI + i) * 4
+		var color := GOLD if i % 2 == 0 else MINT
+		color.a = 0.35 + 0.65 * (sin(beat * PI + i * 1.7) * 0.5 + 0.5)
+		draw_line(sparkle - Vector2(3, 0), sparkle + Vector2(3, 0), color, 2)
+		draw_line(sparkle - Vector2(0, 3), sparkle + Vector2(0, 3), color, 2)
+	_cat_sprite(position, frame, 2.0, sin(beat * PI) * 0.14, Vector2(mirror / stretch, stretch))
 
 func _results() -> void:
 	draw_rect(Rect2(0, 0, 640, 360), Color(0.2, 0.17, 0.23, 0.3))
 	_panel(Rect2(113, 25, 414, 309))
 	_text("A CAT WELL FED.", Vector2(320, 43), 24, GOLD, true)
 	_text("NEW PERSONAL BEST!" if score > old_best else "A NOBLE DAY OF SNACKING.", Vector2(320, 77), 8, PINK, true)
-	_cat_sprite(Vector2(200, 151), 3 if catches > 0 else 5, 2.1, sin(clock * 2) * 0.04)
+	_victory_dance()
 	_text(CAT_NAMES[cat_name_index], Vector2(200, 177), 8, MINT, true)
 	_text("FINAL SCORE", Vector2(376, 102), 8, MINT, true)
 	_text("%05d" % score, Vector2(376, 123), 32, CREAM, true)
 	_text("BEST %05d" % best, Vector2(376, 164), 8, GOLD, true)
 	draw_line(Vector2(145, 191), Vector2(495, 191), Color("796274"))
-	_text("CAUGHT", Vector2(185, 205), 8, MINT, true)
-	_text("%d" % catches, Vector2(185, 225), 16, CREAM, true)
-	_text("MISSED", Vector2(320, 205), 8, MINT, true)
-	_text("%d" % misses, Vector2(320, 225), 16, CREAM, true)
-	_text("BEST STREAK", Vector2(449, 205), 8, MINT, true)
-	_text("%d" % longest, Vector2(449, 225), 16, CREAM, true)
+	for i in range(4):
+		var x := 172 + i * 98
+		_text(["CAUGHT", "MISSED", "BURNT", "STREAK"][i], Vector2(x, 205), 8, MINT, true)
+		_text("%d" % [catches, misses, burnt_eaten, longest][i], Vector2(x, 225), 16, CREAM, true)
 	_button("ANOTHER HELPING", Rect2(146, 270, 210, 34), "start", true)
 	_button("TITLE", Rect2(375, 274, 118, 26), "home")
+
+func _nugget_guide() -> void:
+	draw_rect(Rect2(0, 0, 640, 360), Color(0.2, 0.17, 0.23, 0.35))
+	_panel(Rect2(75, 15, 490, 330))
+	_text("KNOW YOUR NUGGETS", Vector2(320, 31), 16, GOLD, true)
+	_text("BIG: HOLD MOUTH ON IT / POINTS X MULTIPLIER", Vector2(320, 60), 8, MINT, true)
+	var rows := [
+		["regular", "REGULAR", "10 POINTS", "PER THROW"],
+		["big", "BIG REGULAR", "3 CHOMPS / 30 POINTS", "PER THROW"],
+		["burnt", "BURNT", "AVOID! -30 AND COMBO RESET", "PER THROW"],
+		["golden", "GOLDEN", "20 POINTS + ONE MULTIPLIER TIER", "PER THROW"],
+		["big_golden", "BIG GOLDEN", "3 CHOMPS / 100 + COLLECT EDIBLES", "PER ROUND"],
+	]
+	for i in range(rows.size()):
+		var row: Array = rows[i]
+		var y := 82 + i * 40
+		var size := 32 if NUGGET_TYPES[row[0]].hp == 3 else 26
+		draw_texture_rect_region(nugget_tex, Rect2(112 - size / 2.0, y + 13 - size / 2.0, size, size), _nugget_region(row[0]))
+		_text(row[1], Vector2(145, y), 8, PINK if row[0] == "burnt" else GOLD)
+		_text(row[2], Vector2(145, y + 14), 8, CREAM)
+		_text("%d%%" % NUGGET_TYPES[row[0]].chance, Vector2(505, y), 8, GOLD, true)
+		_text(row[3], Vector2(505, y + 14), 8, MINT, true)
+	_text("THROW ODDS AFTER 12S / TWO BIG GOLDENS: %.2f%%" % (BIG_GOLD_ROUND_CHANCE * SECOND_BIG_GOLD_CHANCE * 100), Vector2(320, 284), 8, MINT, true)
+	_button("READY TO SNACK", Rect2(240, 306, 160, 26), "back", true)
 
 func _settings() -> void:
 	draw_rect(Rect2(0, 0, 640, 360), Color(0.2, 0.17, 0.23, 0.3))
@@ -874,7 +1029,7 @@ func _run_smoke_test() -> void:
 		_pause()
 		_resume()
 		assert(selected_track == round_track and cat_palette == round_cat)
-	assert(seen_tracks.size() == TRACKS.size() and seen_cats.size() == CAT_PALETTES.size())
+	assert(seen_tracks.size() == TRACKS.size() and seen_cats.size() == cat_palettes.size())
 	_action("home")
 	var before_click := cat_palette
 	var name_before_click := cat_name_index
@@ -886,16 +1041,20 @@ func _run_smoke_test() -> void:
 	assert(cat_palette == clicked_color and cat_name_index == clicked_name and not title_cat_selected)
 	_start()
 	assert(cat_palette != clicked_color and cat_name_index != clicked_name) # Replay resumes normal randomization.
-	var original := cat_textures[0].get_image()
-	for palette_index in range(cat_textures.size()):
-		var image := cat_textures[palette_index].get_image()
-		assert(image.get_size() == original.get_size() and image.get_pixel(0, 0).a == 0)
-		assert(image.get_pixel(16, 24).to_rgba32() == CAT_PALETTES[palette_index].eyes.to_rgba32())
-		assert(image.get_pixel(17, 24).to_rgba32() == Color("422b3e").to_rgba32())
-		for frame in range(8):
-			var feature := Vector2i(16, 22) if frame in [1, 5, 7] else Vector2i(15, 20)
-			feature.x += frame * 48
-			assert(image.get_pixelv(feature) == original.get_pixelv(feature))
+	var role_examples := {}
+	for pixel in range(cat_art.indices.size()):
+		role_examples[cat_art.indices[pixel]] = Vector2i(pixel % cat_art.image_size.x, pixel / cat_art.image_size.x)
+	assert(role_examples.size() == cat_art.roles.size())
+	for palette_index in range(cat_palettes.size()):
+		var texture := cat_art.texture_for_palette(palette_index)
+		assert(texture == cat_art.texture_for_palette(palette_index)) # Cached, not rebuilt.
+		var image := texture.get_image()
+		assert(image.get_size() == cat_art.image_size and image.get_pixelv(role_examples[0]).a == 0)
+		for role in range(1, cat_art.roles.size()):
+			var expected := Color(str(cat_palettes[palette_index].colors[cat_art.roles[role]]))
+			assert(image.get_pixelv(role_examples[role]).to_rgba32() == expected.to_rgba32())
+		for frame in range(cat_art.frame_count):
+			assert(image.get_region(Rect2i(cat_art.frame_rect(frame))).get_used_rect().has_area())
 	# Exercise actual persistence against a disposable project-local file.
 	if not OS.has_feature("standalone"):
 		DirAccess.make_dir_recursive_absolute("res://build")
@@ -916,5 +1075,5 @@ func _run_smoke_test() -> void:
 		assert(best == 1234 and is_equal_approx(music_volume, 0.3) and is_equal_approx(sfx_volume, 0.8))
 		assert(selected_track == 2 and fullscreen and not shuffle_music)
 		DirAccess.remove_absolute("res://build/test_save.cfg")
-	print("SMOKE TEST PASSED: gameplay (%d misses), %d tracks, 48 randomized rounds without repeats, %d cat palettes, preserved eyes/transparency, manual selection, saved shuffle preference." % [simulated_misses, TRACKS.size(), CAT_PALETTES.size()])
+	print("SMOKE TEST PASSED: gameplay (%d misses), %d tracks, 48 randomized rounds, %d external cat palettes, indexed roles, cached textures, all animation frames, manual selection, saved preferences." % [simulated_misses, TRACKS.size(), cat_palettes.size()])
 	get_tree().quit(0)
