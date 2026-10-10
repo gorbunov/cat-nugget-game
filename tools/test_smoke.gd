@@ -15,12 +15,37 @@ static func run(game: Game) -> void:
 	if not OS.has_feature("standalone"):
 		checks.append(_check_persistence)
 	checks.append(_check_navigation)
+	checks.append(_check_rooms)
 	for check in checks:
 		if not check.call(game):
 			game.get_tree().quit(1)
 			return
 	print("SMOKE TEST PASSED: gameplay, pacing, music, 48 randomized rounds, palettes, cached textures, animation frames, manual selection, saved preferences and navigation.")
 	game.get_tree().quit(0)
+
+
+static func _check_rooms(game: Game) -> bool:
+	game.room.rng.seed = 4621
+	var seen := {}
+	for i in range(32):
+		var previous := game.room.index
+		game._start_round()
+		var chosen := game.room.index
+		var detail := game.room.variation
+		assert(chosen != previous and chosen >= 0 and chosen < game.room.NAMES.size())
+		seen[chosen] = true
+		game._pause()
+		game._handle_action("settings")
+		game._handle_action("back")
+		game._resume()
+		game._finish_round()
+		assert(game.room.index == chosen and game.room.variation == detail)
+	assert(seen.size() == game.room.NAMES.size())
+	var gameplay_rng_state := game.random.state
+	game.room.choose_next()
+	assert(game.random.state == gameplay_rng_state)
+	print("ROOM CHECK: all four rooms, no consecutive repeats, stable through navigation/results, independent scenery randomness.")
+	return true
 
 
 static func _check_scoring(game: Game) -> bool:

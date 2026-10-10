@@ -34,6 +34,25 @@ func _run() -> void:
 		game._step(1.0 / 60.0)
 	game._catch(Vector2(340, 210))
 	await _capture(game, "gameplay")
+	if "--rooms" in OS.get_cmdline_user_args():
+		game.hands.clear()
+		game.nuggets.clear()
+		game.particles.clear()
+		game.popups.clear()
+		game.banner_time = 0
+		game.cat = Vector2(320, 230)
+		var board := Image.create(1280, 720, false, Image.FORMAT_RGBA8)
+		for i in range(game.room.NAMES.size()):
+			game._change_screen(game.Screen.PLAYING)
+			game.room.index = i
+			game.room.variation = i
+			var rng_state: int = game.room.rng.state
+			await _capture(game, "room_%02d" % i)
+			assert(game.room.rng.state == rng_state)
+			var screen := root.get_texture().get_image()
+			screen.resize(640, 360, Image.INTERPOLATE_NEAREST)
+			board.blit_rect(screen, Rect2i(0, 0, 640, 360), Vector2i((i % 2) * 640, (i / 2) * 360))
+		board.save_png("res://build/previews/rooms.png")
 	if "--nuggets" in OS.get_cmdline_user_args():
 		game.hands.clear()
 		game.nuggets.clear()
@@ -96,7 +115,7 @@ func _run() -> void:
 			board.blit_rect(screen, Rect2i(132, 65, 132, 123), Vector2i((i % 4) * 132, (i / 4) * 123))
 		board.resize(1056, 492, Image.INTERPOLATE_NEAREST)
 		board.save_png("res://build/previews/victory_dance.png")
-	print("Rendered five preview screens in build/previews.")
+	print("Rendered preview screens in build/previews.")
 	quit()
 
 func _check_settings(game: Node2D) -> void:

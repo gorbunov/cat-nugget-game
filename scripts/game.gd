@@ -46,9 +46,11 @@ const Difficulty := preload("res://scripts/difficulty.gd")
 const GameAudio := preload("res://scripts/game_audio.gd")
 const ScreenLayout := preload("res://scripts/screen_layout.gd")
 const Screen := ScreenLayout.Screen
+const RoomBackground := preload("res://scripts/room_background.gd")
 
 # Assets and appearance (the chosen cat persists through pause and results).
 var cat_art := CatAppearance.new()
+var room := RoomBackground.new()
 var cat_palettes: Array[Dictionary] = []
 var cat_tex: Texture2D
 var nugget_tex: Texture2D = preload("res://assets/nuggets.png")
@@ -122,6 +124,7 @@ var test_mode := false:
 func _ready() -> void:
 	texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 	random.randomize()
+	room.choose_next()
 	var smoke_requested := "--smoke-test" in OS.get_cmdline_user_args()
 	test_mode = test_mode or smoke_requested
 	_load_settings()
@@ -366,6 +369,7 @@ func _drag_volume(pointer_x: float) -> void:
 
 func _start_round() -> void:
 	_change_screen(Screen.PLAYING)
+	room.choose_next()
 	remaining = ROUND_LENGTH
 	_set_music_rate(1.0)
 	if not title_cat_selected:
@@ -705,7 +709,7 @@ func _button(label: String, action: String, primary: bool = false) -> void:
 func _draw() -> void:
 	if cat_tex == null:
 		return
-	_kitchen()
+	room.draw(self)
 	if state == Screen.TITLE:
 		_title()
 	elif state == Screen.RESULTS:
@@ -728,50 +732,6 @@ func _draw() -> void:
 			_button("NUGGET GUIDE", "guide")
 			_button("BACK TO TITLE", "home")
 			_text("ESC TO RESUME", Vector2(320, 299), 8, MINT, true)
-
-func _kitchen() -> void:
-	draw_rect(Rect2(0, 0, 640, 360), Color("c9d9c6"))
-	for y in range(54, 299, 30):
-		draw_line(Vector2(0, y), Vector2(640, y), Color("bacebe"))
-		for x in range(-20 if int(y / 30.0) % 2 == 1 else 0, 640, 48):
-			draw_line(Vector2(x, y), Vector2(x, y + 30), Color("bacebe"))
-	# Window and sky.
-	draw_rect(Rect2(245, 76, 150, 128), Color("829d91"))
-	draw_rect(Rect2(249, 80, 142, 120), Color("f7e9cc"))
-	draw_rect(Rect2(255, 86, 130, 108), Color("a9cecb"))
-	draw_rect(Rect2(262, 107, 35, 7), Color("dce5d1"))
-	draw_rect(Rect2(271, 102, 18, 15), Color("dce5d1"))
-	draw_circle(Vector2(357, 107), 13, Color("f6dfa5"))
-	draw_rect(Rect2(255, 159, 130, 35), Color("9cbaa9"))
-	draw_rect(Rect2(316, 83, 6, 116), Color("f7e9cc"))
-	draw_rect(Rect2(249, 137, 142, 6), Color("f7e9cc"))
-	draw_rect(Rect2(239, 199, 162, 7), Color("ebdfc2"))
-	# Shelves, jars, plant.
-	draw_rect(Rect2(48, 132, 136, 7), Color("a79585"))
-	draw_rect(Rect2(54, 139, 6, 12), Color("a79585"))
-	draw_rect(Rect2(173, 139, 6, 12), Color("a79585"))
-	for x in [67, 100, 133]:
-		draw_rect(Rect2(x, 108, 21, 24), Color("dfd9b9"))
-		draw_rect(Rect2(x-1, 105, 23, 5), Color("b39589"))
-		draw_rect(Rect2(x+4, 115, 13, 9), Color("ede3c6"))
-	draw_rect(Rect2(462, 144, 125, 7), Color("a79585"))
-	draw_rect(Rect2(534, 122, 25, 22), Color("c79f88"))
-	draw_line(Vector2(546, 124), Vector2(546, 92), Color("829d81"), 3)
-	for p in [Vector2(535, 104), Vector2(551, 94), Vector2(552, 114)]:
-		draw_rect(Rect2(p, Vector2(12, 6)), Color("8da989"))
-	draw_rect(Rect2(480, 117, 24, 27), Color("e3dbc5"))
-	draw_rect(Rect2(504, 122, 7, 13), Color("e3dbc5"), false, 3)
-	# Counter and cupboard fronts.
-	draw_rect(Rect2(0, 302, 640, 58), Color("91aaa0"))
-	draw_rect(Rect2(0, 298, 640, 8), Color("eee0bf"))
-	draw_rect(Rect2(0, 306, 640, 4), Color("738e87"))
-	for x in range(8, 640, 106):
-		draw_rect(Rect2(x, 318, 94, 39), Color("a7bdb0"), false, 2)
-		draw_rect(Rect2(x+39, 326, 17, 3), Color("728e83"))
-	# Dish towel.
-	draw_rect(Rect2(564, 301, 30, 45), Color("e7d4b9"))
-	for x in range(569, 594, 8):
-		draw_rect(Rect2(x, 302, 2, 44), Color("c1a899"))
 
 func _cat_sprite(position: Vector2, frame: int, scale_factor: float = 1.5, angle: float = 0.0, pose_scale: Vector2 = Vector2.ONE) -> void:
 	var stretch := 1.0 + minf(cat_velocity.length() / 10000, 0.14) if state == Screen.PLAYING else 1.0
