@@ -1,6 +1,6 @@
 # Nugget Cat · 0.11.5
 
-A tiny, original pixel-art arcade game for Godot 4.7.2 and macOS.
+A tiny, original pixel-art arcade game for Godot 4.7.2, with macOS, Windows and Web exports.
 An orange cat. Sixty seconds. An unreasonable amount of chicken.
 
 ## Why we made this
@@ -20,11 +20,13 @@ publish or share it publicly.
 
 ## Play
 
-Open **`build/Nugget Cat.app`**, or import `project.godot` in Godot and press **F6/F5**.
+Open **`build/macos/Nugget Cat.app`**, or import `project.godot` in Godot and press **F6/F5**.
+Windows builds are in `build/windows/`. For a browser preview, run
+`python3 tools/serve_web.py` and open **http://127.0.0.1:8060/**.
 
 - **Mouse:** move the cat's mouth; catches happen automatically.
 - **Enter / Space:** start a round or replay from results.
-- **Escape:** quit from the title screen, pause/resume during a round, or close a settings/guide/sources panel. The game also pauses when it loses focus.
+- **Escape:** quit from the desktop title screen, pause/resume during a round, or close a settings/guide/sources panel. Browser/tablet builds omit Quit; Escape on their title screen does nothing. The game also pauses when it loses focus.
 - **F11 / Option+Return:** toggle fullscreen. On keyboards with media keys, use **Fn+F11**.
 - **Start-screen square expand/contract icon:** switch fullscreen mode with one click.
 - **Settings:** fullscreen toggle, music selection, and Master/Music/Sounds volume sliders.
@@ -37,6 +39,10 @@ reactions balanced below it.
 Fullscreen switching during a round pauses the game so window changes never cost a
 catch. Press Escape or Keep Munching to continue. Windowed size and position are
 restored when leaving fullscreen. Fullscreen and soundtrack preferences are saved.
+Browser fullscreen uses the on-screen control or **Alt+Enter**, and is shown only
+when supported by the browser/embedding page. Browser F11 remains browser-owned.
+Saved fullscreen is not restored automatically in a browser: it requires a user
+gesture. Music starts after the first click, keypress or touch on the game.
 
 ### Soundtrack
 
@@ -311,9 +317,13 @@ location (`~/Library/Application Support/Godot/app_userdata/Nugget Cat/`).
 | `tools/test_nuggets.gd` | Multi-chomp, hazard, buff, sweep and probability integration checks |
 | `tools/test_smoke.gd` | Round, music, palette, persistence and navigation checks; invoked with `--smoke-test` |
 | `art_sources/` | Generated source, request metadata and enlarged sprite preview; ignored by Godot |
-| `tools/fetch_template.py` | Fetch matching macOS template into this project using HTTP byte ranges |
+| `release.json` | Canonical game version and pinned Godot version |
+| `tools/build_release.py` | Sync versions, import, test, export and package platform builds |
+| `tools/serve_web.py` | Serve the Web build locally for browser playtesting |
+| `scripts/platform_policy.gd` | Platform capabilities for Quit and fullscreen controls |
+| `tools/fetch_template.py` | Optional local macOS-template fallback using HTTP byte ranges |
 | `tools/preview.gd` | Render actual game screens; `--rooms --bites` covers scenery and bite stages |
-| `export_presets.cfg` | Local macOS export configuration |
+| `export_presets.cfg` | macOS, Windows x86_64 and single-threaded Web export presets |
 | `build/` | App, zip, export template, and preview screenshots; ignored by Godot |
 
 ### Code organization
@@ -399,14 +409,45 @@ mkdir -p build/previews
 # Also verify actual fullscreen transitions and music previews.
 /Applications/Godot.app/Contents/MacOS/Godot --path . --script tools/preview.gd -- --check-settings
 
-# Get only the macOS template; no global Godot installation changes.
-python3 tools/fetch_template.py
+# Import, run tests/audio checks, and export all three platforms.
+python3 tools/build_release.py
+open "build/macos/Nugget Cat.app"
 
-# Export an ad-hoc-signed local build.
-/Applications/Godot.app/Contents/MacOS/Godot --headless --path . --export-release macOS "build/Nugget Cat.zip"
-ditto -x -k "build/Nugget Cat.zip" build
-open "build/Nugget Cat.app"
+# Or build one target, with the same checks.
+python3 tools/build_release.py --targets web
+python3 tools/serve_web.py
 ```
+
+Install matching **4.7.2** export templates using Godot's Export Template Manager.
+The Web preset needs `web_nothreads_debug.zip` and `web_nothreads_release.zip`;
+it does not require SharedArrayBuffer or cross-origin isolation headers. Serve
+the output over HTTP(S), rather than opening `index.html` as a local file.
+
+`release.json` is the source of truth for versioning. After editing it, run
+`python3 tools/build_release.py --sync-only` to update the README heading,
+Godot application version, and macOS/Windows package versions. The normal build
+command also synchronizes them and checks the installed Godot version.
+`--check-version` verifies alignment without changing files. `--godot` (or the
+`GODOT` environment variable) can select the matching executable.
+
+| Target | Build output |
+|---|---|
+| macOS | `build/macos/Nugget Cat.zip` and extracted `Nugget Cat.app` |
+| Windows | `build/windows/Nugget Cat.exe` and `Nugget Cat-windows.zip` |
+| Web | `build/web/index.html` and supporting files; upload the whole folder |
+
+Build/import/test logs are retained in `build/logs/`. All three targets export;
+Safari and Chrome passed user playtesting. Windows-device testing and itch.io
+embedded/fullscreen checks remain release milestones in `RELEASE_PLAN.md`;
+Firefox is deferred. Browser storage is local to that browser/origin
+and may be cleared by the player or browser. Native tablet controls are still a
+later milestone.
+
+The branded Web loading page is `web/shell.html`; it keeps real download progress
+and startup-error reporting while using the cat artwork and game colors. Both
+Web and native startup use `assets/boot_splash.png`, prepared offline from the
+happy ginger cat with `tools/prepare_boot_splash.gd`. The Sources screen includes
+the **Made with Godot** credit.
 
 The macOS app is a local playtest release, ad-hoc signed rather than notarized
 for public distribution. The source project is also playable directly in Godot.

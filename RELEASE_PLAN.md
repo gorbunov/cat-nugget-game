@@ -1,10 +1,14 @@
 # Cross-platform release plan
 
-**Status: gameplay polish passed user playtesting on 2026-10-10. Ready for Step 1.**
+**Status: gameplay polish passed user playtesting on 2026-10-10. Step 1 complete.**
 The accepted polish includes the 15-second bouncing boss finale, accelerated bites,
 AI-sprite belly-dance reward, and randomized title-screen feeding with spawn sparks.
-Resume with Step 1 below. This is a roadmap, not a claim that platform builds or
-publishing automation already exist.
+macOS, Windows and single-threaded Web exports now succeed using installed Godot
+4.7.2 templates. Safari and Chrome passed user playtesting on 2026-10-10;
+Firefox is deferred by the owner. Next: macOS public-download signing/notarization
+(Step 2), Windows device testing (Step 3), and itch.io embedded-browser checks.
+Publishing/upload
+automation and native tablet controls are still later milestones.
 
 ## Distribution decision
 
@@ -28,16 +32,30 @@ browser play if it passes testing.** Native tablet releases should not delay it.
 ## Step-by-step milestones
 
 ### 1. Establish a portable release baseline
-- [ ] Keep Godot and export templates pinned to matching versions.
-- [ ] Add Windows and Web export presets alongside macOS.
-- [ ] Adapt platform-specific behavior: desktop title-screen Esc quits;
+- [x] Keep Godot and export templates pinned to matching versions.
+- [x] Add Windows and Web export presets alongside macOS.
+- [x] Adapt platform-specific behavior: desktop title-screen Esc quits;
   browser/tablet builds use appropriate navigation and omit Quit.
-- [ ] Expose fullscreen controls only where supported.
-- [ ] Centralize release versioning and define per-platform output folders.
-- [ ] Run existing tests and export all three targets.
+- [x] Expose fullscreen controls only where supported.
+- [x] Centralize release versioning and define per-platform output folders.
+- [x] Run existing tests and export all three targets.
 
 **Done when:** macOS, Windows and Web export successfully with tests passing.
 No publishing credentials are needed for this step.
+
+**Verified 2026-10-10:** imports, smoke checks (including simulated platform
+policies), nugget/boss mechanics, audio checks, native fullscreen/settings checks,
+all three exports, and macOS signature verification. The local Web server serves
+HTML/WASM correctly. Export success is not Windows/browser gameplay validation.
+
+- `release.json` pins game/engine versions; `tools/build_release.py` synchronizes
+  version metadata, checks the engine, imports, tests and exports.
+- Artifacts: `build/macos/Nugget Cat.zip` plus `.app`,
+  `build/windows/Nugget Cat-windows.zip` plus `.exe`, and `build/web/index.html`
+  with supporting files. Build logs are in `build/logs/`.
+- `python3 tools/serve_web.py` serves the Web build at http://127.0.0.1:8060/.
+  Single-threaded Web templates are installed and used; no cross-origin isolation
+  headers are required.
 
 ### 2. Prepare macOS for public downloads
 - [ ] Configure Developer ID Application signing, hardened runtime and appropriate
@@ -70,13 +88,21 @@ workaround. Direct distribution does not require a Mac App Store listing.
 **Done when:** testers get both desktop builds from one page and can update them.
 
 ### 5. Make browser play comfortable
-- [ ] Start audio after a user interaction to satisfy browser autoplay rules.
+- [x] Implement audio start after a user interaction; actual browser autoplay
+  behavior remains part of the browser playtests below.
 - [ ] Adapt fullscreen, exit/navigation and embedded display sizing.
 - [ ] Verify browser-local save persistence and document its limitations.
 - [ ] Investigate compressed music to reduce download size and memory use.
-- [ ] Prefer a single-threaded Web export if supported by the pinned Godot version;
-  verify hosting requirements before enabling threads.
-- [ ] Test Safari, Chrome and Firefox, both embedded and fullscreen.
+- [x] Use a single-threaded Web export with matching installed templates; serve
+  via HTTP(S), without cross-origin isolation requirements.
+- [x] Safari and Chrome: user reports browser play working (2026-10-10).
+- [ ] Verify itch.io embedded play and fullscreen after uploading the build.
+- Firefox: deferred by the owner; not a first-release blocker.
+
+The Web loader is branded with Nugget Cat artwork, colors and download progress;
+the native boot splash uses the same happy cat. A Chrome startup check verified
+the loader reaches the game and removes its overlay. The Sources screen carries
+the "Made with Godot" engine credit.
 
 **Done when:** a visitor can click Play on itch.io and finish a round without setup.
 

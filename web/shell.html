@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="utf-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+	<title>$GODOT_PROJECT_NAME</title>
+	<style>
+		:root { color-scheme: dark; font-family: ui-monospace, "Courier New", monospace; color: #fff0cd; background: #423044; }
+		* { box-sizing: border-box; }
+		html, body { margin: 0; width: 100%; height: 100%; overflow: hidden; touch-action: none; }
+		#canvas { display: block; outline: none; }
+		#loading { position: fixed; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; padding: 20px; text-align: center; background: #423044; }
+		#loading img { width: clamp(96px, 26vh, 192px); height: auto; image-rendering: pixelated; }
+		h1 { margin: 0; color: #ffc568; font-size: clamp(24px, 5vw, 40px); letter-spacing: 0.08em; }
+		.tagline { margin: 0 0 8px; color: #ed91a5; font-size: clamp(11px, 2vw, 14px); }
+		#progress { width: min(280px, 80vw); height: 14px; padding: 3px; border: 2px solid #806678; background: #302636; }
+		#fill { width: 0; height: 100%; background: #ffc568; }
+		#progress.indeterminate #fill { width: 28%; animation: munch 1.1s ease-in-out infinite alternate; }
+		@keyframes munch { from { transform: translateX(0); } to { transform: translateX(255%); } }
+		@media (prefers-reduced-motion: reduce) { #progress.indeterminate #fill { width: 100%; animation: none; opacity: 0.6; } }
+		#message { margin: 0; min-height: 1.4em; color: #9bd2bc; font-size: 13px; }
+		#error { max-width: 520px; margin: 0; color: #ed91a5; white-space: pre-wrap; overflow-wrap: anywhere; }
+		noscript { position: fixed; inset: 0; z-index: 2; padding: 20vh 20px; text-align: center; background: #423044; }
+	</style>
+	$GODOT_HEAD_INCLUDE
+</head>
+<body>
+	<canvas id="canvas" tabindex="0" aria-label="Nugget Cat game">Your browser does not support the game canvas.</canvas>
+	<div id="loading">
+		<img src="$GODOT_SPLASH" width="192" height="192" alt="A happy ginger kitten">
+		<h1>NUGGET CAT</h1>
+		<p class="tagline">NO THOUGHTS. JUST CHICKEN.</p>
+		<div id="progress" class="indeterminate" role="progressbar" aria-label="Loading Nugget Cat" aria-valuemin="0" aria-valuemax="100"><div id="fill"></div></div>
+		<p id="message" role="status">Preparing the feast...</p>
+		<p id="error" role="alert" hidden></p>
+	</div>
+	<noscript>Please enable JavaScript to play Nugget Cat.</noscript>
+	<script src="$GODOT_URL"></script>
+	<script>
+	(function () {
+		const overlay = document.getElementById('loading');
+		const progress = document.getElementById('progress');
+		const fill = document.getElementById('fill');
+		const message = document.getElementById('message');
+		const errorText = document.getElementById('error');
+		function fail(error) {
+			progress.hidden = true;
+			message.textContent = 'The feast could not start.';
+			errorText.textContent = (error instanceof Error ? error.message : String(error)) + '\nReload the page to try again.';
+			errorText.hidden = false;
+			console.error(error);
+		}
+		try {
+			const config = $GODOT_CONFIG;
+			const missing = Engine.getMissingFeatures({ threads: $GODOT_THREADS_ENABLED });
+			if (missing.length) {
+				fail('This browser is missing features needed by Nugget Cat:\n' + missing.join('\n'));
+				return;
+			}
+			const engine = new Engine(config);
+			engine.startGame({
+				onProgress: function (current, total) {
+					if (current > 0 && total > 0) {
+						const percent = Math.min(100, Math.floor(current * 100 / total));
+						progress.classList.remove('indeterminate');
+						progress.setAttribute('aria-valuenow', percent);
+						fill.style.width = percent + '%';
+						message.textContent = percent === 100 ? 'Waking up the cat...' : 'Preparing the feast... ' + percent + '%';
+					} else {
+						progress.classList.add('indeterminate');
+						progress.removeAttribute('aria-valuenow');
+						fill.style.width = '';
+						message.textContent = 'Preparing the feast...';
+					}
+				}
+			}).then(function () { overlay.remove(); }, fail);
+		} catch (error) {
+			fail(error);
+		}
+	}());
+	</script>
+</body>
+</html>

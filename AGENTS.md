@@ -1,7 +1,7 @@
 # Repository guidance
 
 ## Project context and publication
-- Cross-platform publishing roadmap: `RELEASE_PLAN.md`. Gameplay polish passed user playtesting on 2026-10-10; resume at Step 1 when requested.
+- Cross-platform publishing roadmap: `RELEASE_PLAN.md`. Gameplay polish passed user playtesting on 2026-10-10. The portable release baseline is implemented; see the roadmap for verification status and next steps.
 - This is a parent-and-child hobby project, made to teach planning, iteration and following through to a playable result. Preserve this context in README and future publication materials.
 - When preparing a public release, store page or announcement, carry forward README's AI-generated images/music disclosure and the third-party sound credits (`art_sources/reactions.json`). The crowd/gulp recordings are CC0 sources, not AI-generated audio.
 
@@ -39,16 +39,17 @@ GODOT=/Applications/Godot.app/Contents/MacOS/Godot
 - Image generation makes a billed request with no automatic retries. Use a fresh `--name` (existing source PNGs are protected), e.g. `python3 tools/generate_ai_art.py --asset nuggets --name nuggets_v002`. Prefer offline converters when no new artwork is needed.
 - Credentials resolve from `OPENAI_API_KEY`, then macOS Keychain service `CatNuggetGame.OpenAI`. `python3 tools/generate_ai_art.py --check-key` checks availability without exposing the key or calling the API. For setup use interactive `python3 tools/setup_api_key.py`; it verifies native Keychain read-back and avoids the CLI password-prompt length issue. See README for the full art workflow.
 
-## macOS packaging
-- `python3 tools/fetch_template.py` fetches the pinned 4.7.2 macOS template into `build/templates/macos.zip`; the export preset uses this local template.
+## Cross-platform builds and macOS packaging
+- `release.json` owns game and engine versions. `python3 tools/build_release.py` syncs README/project/export versions, verifies the engine, imports, tests and exports macOS/Windows/Web into `build/macos`, `build/windows` and `build/web`. Logs go to `build/logs`. Use `--targets web` (or `macos` / `windows`) for a single target; `--sync-only` updates version metadata and `--check-version` checks it without writing.
+- Presets use installed matching Godot templates. Single-threaded Web requires `web_nothreads_debug.zip` and `web_nothreads_release.zip`. `python3 tools/serve_web.py` serves `build/web` on localhost:8060; no cross-origin isolation headers are required.
+- `tools/fetch_template.py` remains an optional local macOS-template fallback; it reads the engine pin from `release.json`, but presets now default to the installed templates.
+- `scripts/platform_policy.gd` gates Quit/fullscreen in drawing, hit testing and actions. Browser fullscreen requires a user gesture and is never auto-restored; browser audio also waits for a gesture. Native tablet controls remain a later milestone.
 - Preserve `include_filter="assets/*.json"` in `export_presets.cfg`: runtime palette metadata must ship with the app.
 - Export creates a zip; extract it to update the runnable app:
 
 ```sh
-"$GODOT" --headless --path . --export-release macOS "build/Nugget Cat.zip"
-ditto -x -k "build/Nugget Cat.zip" build
-codesign --verify --deep --strict --verbose=2 "build/Nugget Cat.app"
-open "build/Nugget Cat.app"
+python3 tools/build_release.py --targets macos
+open "build/macos/Nugget Cat.app"
 ```
 
-- Builds are ad-hoc signed local playtests, not notarized releases. When bumping a release, keep the README heading and both `application/short_version` and `application/version` in `export_presets.cfg` aligned.
+- macOS builds are ad-hoc signed local playtests, not notarized releases. Windows exports and Web exports still need platform playtesting before publication.

@@ -3,12 +3,13 @@
 Keeps the matching template in this project rather than installing globally.
 """
 from pathlib import Path
+import json
 import struct
 import urllib.request
 import zlib
 
 ROOT = Path(__file__).resolve().parents[1]
-VERSION = "4.7.2-stable"
+VERSION = json.loads((ROOT / "release.json").read_text())["godot"] + "-stable"
 URL = f"https://github.com/godotengine/godot-builds/releases/download/{VERSION}/Godot_v{VERSION}_export_templates.tpz"
 
 

@@ -16,12 +16,49 @@ static func run(game: Game) -> void:
 		checks.append(_check_persistence)
 	checks.append(_check_navigation)
 	checks.append(_check_rooms)
+	checks.append(_check_platform_controls)
 	for check in checks:
 		if not check.call(game):
 			game.get_tree().quit(1)
 			return
 	print("SMOKE TEST PASSED: gameplay, pacing, music, 48 randomized rounds, palettes, cached textures, animation frames, manual selection, saved preferences and navigation.")
 	game.get_tree().quit(0)
+
+static func _check_platform_controls(game: Game) -> bool:
+	var original := game.platform
+	game.platform = Game.PlatformPolicy.new()
+	game.platform.web = true
+	game.platform.mobile = false
+	game.platform.web_fullscreen_available = false
+	game._change_screen(Game.Screen.TITLE)
+	assert(not game.platform.can_quit() and not game.platform.supports_fullscreen())
+	for action in ["quit", "fullscreen"]:
+		var position := Game.ScreenLayout.button_rect(Game.Screen.TITLE, action).get_center()
+		assert(Game.ScreenLayout.action_at(Game.Screen.TITLE, position, false, false).is_empty())
+		game._activate_button_at(position)
+		assert(game.state == Game.Screen.TITLE)
+	game._handle_action("quit") # Must not terminate the browser application.
+	var escape := InputEventKey.new()
+	escape.keycode = KEY_ESCAPE
+	escape.pressed = true
+	game._input(escape)
+	assert(game.state == Game.Screen.TITLE and game.browser_audio_started)
+	assert(not game.audio.playback_enabled) # Test mode still protects audio/saves.
+	game._handle_action("settings")
+	game._input(escape)
+	assert(game.state == Game.Screen.TITLE)
+	game.platform.web_fullscreen_available = true
+	assert(game.platform.supports_fullscreen())
+	var fullscreen_position := Game.ScreenLayout.button_rect(Game.Screen.TITLE, "fullscreen").get_center()
+	assert(Game.ScreenLayout.action_at(Game.Screen.TITLE, fullscreen_position, false, true) == "fullscreen")
+	game.platform.web = false
+	game.platform.mobile = true
+	assert(not game.platform.can_quit() and not game.platform.supports_fullscreen())
+	game.platform.mobile = false
+	assert(game.platform.can_quit() and game.platform.supports_fullscreen())
+	game.platform = original
+	print("PLATFORM CHECK: browser/mobile omit Quit, unsupported fullscreen cannot be clicked, overlay Escape works, audio waits for a gesture.")
+	return true
 
 
 static func _check_rooms(game: Game) -> bool:

@@ -67,6 +67,9 @@ const GameAudio := preload("res://scripts/game_audio.gd")
 const ScreenLayout := preload("res://scripts/screen_layout.gd")
 const Screen := ScreenLayout.Screen
 const RoomBackground := preload("res://scripts/room_background.gd")
+const PlatformPolicy := preload("res://scripts/platform_policy.gd")
+var platform := PlatformPolicy.new()
+var browser_audio_started := false
 
 # Assets and appearance (the chosen cat persists through pause and results).
 var cat_art := CatAppearance.new()
@@ -156,7 +159,11 @@ func _ready() -> void:
 	room.choose_next()
 	var smoke_requested := "--smoke-test" in OS.get_cmdline_user_args()
 	test_mode = test_mode or smoke_requested
+	platform.detect_browser_features()
 	_load_settings()
+	# Browser fullscreen requires a fresh user gesture, never a saved preference.
+	if platform.web or not platform.supports_fullscreen():
+		fullscreen = false
 	if cat_art.load_assets() != OK:
 		get_tree().quit(1)
 		return
@@ -180,6 +187,7 @@ func _ready() -> void:
 	queue_redraw()
 
 func _setup_audio() -> void:
+	audio.playback_enabled = not test_mode and not platform.web
 	_set_volumes()
 	_select_track(_random_choice(-1, TRACKS.size()) if shuffle_music else selected_track)
 
@@ -214,6 +222,8 @@ func _start_panic_music() -> void:
 # ---- Window and screen transitions. ----
 
 func _toggle_fullscreen() -> void:
+	if not platform.supports_fullscreen():
+		return
 	var window := get_window()
 	fullscreen = window.mode not in [Window.MODE_FULLSCREEN, Window.MODE_EXCLUSIVE_FULLSCREEN]
 	# A resize changes pointer coordinates; pause first to avoid accidental catches.
@@ -225,8 +235,9 @@ func _toggle_fullscreen() -> void:
 		window.mode = Window.MODE_FULLSCREEN
 	else:
 		window.mode = Window.MODE_WINDOWED
-		window.size = windowed_size
-		window.position = windowed_position
+		if not platform.web:
+			window.size = windowed_size
+			window.position = windowed_position
 	_save_settings()
 
 func _change_screen(next_screen: ScreenLayout.Screen) -> void:
@@ -299,6 +310,13 @@ func _notification(what: int) -> void:
 		_save_settings()
 
 func _input(event: InputEvent) -> void:
+	if platform.web and not browser_audio_started and (
+			(event is InputEventMouseButton and event.pressed)
+			or (event is InputEventKey and event.pressed and not event.echo)
+			or (event is InputEventScreenTouch and event.pressed)):
+		browser_audio_started = true
+		audio.playback_enabled = not test_mode
+		audio.restart_music()
 	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT:
 		if not event.pressed and volume_drag >= 0:
 			volume_drag = -1
@@ -315,7 +333,8 @@ func _input(event: InputEvent) -> void:
 		return
 	if event is InputEventKey and event.pressed and not event.echo:
 		if event.is_action_pressed("toggle_fullscreen", false, true):
-			_toggle_fullscreen()
+			if not platform.web or event.keycode != KEY_F11:
+				_toggle_fullscreen()
 		elif event.is_action_pressed("back", false, true):
 			if state == Screen.TITLE:
 				_handle_action("quit")
@@ -334,12 +353,14 @@ func _input(event: InputEvent) -> void:
 		_activate_button_at(get_global_mouse_position())
 
 func _activate_button_at(pointer: Vector2) -> void:
-	var action := ScreenLayout.action_at(state, pointer)
+	var action := ScreenLayout.action_at(state, pointer, platform.can_quit(), platform.supports_fullscreen())
 	if not action.is_empty():
 		_handle_action(action)
 
 
 func _handle_action(action: String) -> void:
+	if not platform.allows_action(action):
+		return
 	_sound("catch", 0.8)
 	match action:
 		"start": _start_round()
@@ -482,6 +503,12 @@ func _finish_round() -> void:
 func _process(delta: float) -> void:
 	if test_mode:
 		return
+	if platform.web:
+		var actual_fullscreen := get_window().mode == Window.MODE_FULLSCREEN
+		if actual_fullscreen != fullscreen:
+			fullscreen = actual_fullscreen
+			if state == Screen.PLAYING:
+				_pause()
 	clock += delta
 	if state == Screen.PLAYING:
 		cat_previous = cat
@@ -832,6 +859,8 @@ func _panel(rect: Rect2, color: Color = INK) -> void:
 	draw_rect(Rect2(rect.position + Vector2(2, 2), rect.size - Vector2(4, 4)), Color("fce8c4"), false, 1)
 
 func _button(label: String, action: String, primary: bool = false) -> void:
+	if not platform.allows_action(action):
+		return
 	var rect := ScreenLayout.button_rect(state, action)
 	var hover := rect.has_point(get_global_mouse_position())
 	var color := GOLD if primary else Color("65536b")
@@ -843,6 +872,8 @@ func _button(label: String, action: String, primary: bool = false) -> void:
 	_text(label, rect.position + Vector2(rect.size.x / 2, (rect.size.y - 8) / 2 - 1), 8, INK if primary else CREAM, true)
 
 func _fullscreen_button() -> void:
+	if not platform.supports_fullscreen():
+		return
 	_button("", "fullscreen")
 	var center := ScreenLayout.button_rect(state, "fullscreen").get_center()
 	# Four pixel corners point outward to expand, inward to restore the window.
@@ -1102,7 +1133,12 @@ func _title() -> void:
 	_text("BEST SNACK SCORE: %05d" % best, Vector2(224, 290), 8, GOLD, true)
 	_button("SOURCES", "sources")
 	_button("NUGGET GUIDE + ODDS", "guide")
-	_text("ENTER: START  /  ESC: QUIT  /  F11: FULLSCREEN", Vector2(320, 348), 8, INK, true)
+	var shortcuts := "ENTER: START"
+	if platform.can_quit():
+		shortcuts += "  /  ESC: QUIT"
+	if platform.supports_fullscreen():
+		shortcuts += "  /  ALT+ENTER: FULLSCREEN" if platform.web else "  /  F11: FULLSCREEN"
+	_text(shortcuts, Vector2(320, 348), 8, INK, true)
 
 func _boss_stage() -> int:
 	return 3 if boss_hp > 27 else (2 if boss_hp > 13 else 1)
@@ -1215,7 +1251,7 @@ func _sources() -> void:
 	draw_rect(Rect2(0, 0, 640, 360), Color(0.2, 0.17, 0.23, 0.35))
 	_panel(Rect2(75, 15, 490, 330))
 	_text("SOUNDS + SOURCES", Vector2(320, 32), 16, GOLD, true)
-	_text("THANKS TO THE FREESOUND CREATORS!", Vector2(320, 60), 8, MINT, true)
+	_text("MADE WITH GODOT / SOUNDS FROM FREESOUND", Vector2(320, 60), 8, MINT, true)
 	for i in range(SOUND_CREDITS.size()):
 		var credit: Dictionary = SOUND_CREDITS[i]
 		var y := 85 + i * 60
@@ -1251,5 +1287,6 @@ func _settings() -> void:
 		_button("+", key + "_up")
 		_text("%d%%" % roundi(value * 100), Vector2(447, y + 8), 8, MINT)
 	_button("FULLSCREEN: ON" if fullscreen else "FULLSCREEN: OFF", "fullscreen")
-	_text("F11 / ALT+ENTER", Vector2(368, 273), 8, MINT)
+	if platform.supports_fullscreen():
+		_text("ALT+ENTER" if platform.web else "F11 / ALT+ENTER", Vector2(368, 273), 8, MINT)
 	_button("ALL GOOD", "back", true)

@@ -56,8 +56,10 @@ static func button_rect(screen: Screen, action: String) -> Rect2:
 	return BUTTONS[screen][action]
 
 
-static func action_at(screen: Screen, position: Vector2) -> String:
+static func action_at(screen: Screen, position: Vector2, can_quit: bool = true, supports_fullscreen: bool = true) -> String:
 	for action: String in BUTTONS[screen]:
+		if (action == "quit" and not can_quit) or (action == "fullscreen" and not supports_fullscreen):
+			continue
 		var rect: Rect2 = BUTTONS[screen][action]
 		if rect.has_point(position):
 			return action
