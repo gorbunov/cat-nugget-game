@@ -19,12 +19,86 @@ static func run(game: Game) -> void:
 	checks.append(_check_platform_controls)
 	checks.append(_check_touch_controls)
 	checks.append(_check_display_layout)
+	checks.append(_check_golden_club)
 	for check in checks:
 		if not check.call(game):
 			game.get_tree().quit(1)
 			return
 	print("SMOKE TEST PASSED: gameplay, pacing, music, 48 randomized rounds, palettes, cached textures, animation frames, manual selection, saved preferences and navigation.")
 	game.get_tree().quit(0)
+
+static func _check_golden_club(game: Game) -> bool:
+	game._change_screen(Game.Screen.TITLE)
+	assert(not game.golden_club_enabled)
+	assert(game._action_at(Vector2(43, 42)).is_empty())
+	game._handle_action("golden_feast")
+	assert(game.state == Game.Screen.TITLE)
+	var nose := Game.ScreenLayout.title_nose_rect(game._title_mouth()).get_center()
+	for i in range(6):
+		game._activate_button_at(nose)
+	assert(not game.golden_club_enabled and game.state == Game.Screen.TITLE)
+	_touch(game, 0, nose, true)
+	_touch(game, 0, nose, false)
+	assert(not game.golden_club_enabled)
+	assert(game.state == Game.Screen.GOLDEN_CLUB)
+	assert(game._action_at(nose).is_empty()) # No title controls through the panel.
+	game._handle_action("back")
+	assert(game.state == Game.Screen.TITLE and not game.golden_club_enabled)
+	for i in range(6):
+		game._activate_button_at(nose)
+	assert(game.state == Game.Screen.TITLE)
+	game._activate_button_at(nose)
+	assert(game.state == Game.Screen.GOLDEN_CLUB)
+	game._handle_action("golden_feast")
+	assert(game.state == Game.Screen.PLAYING and game.golden_club_enabled)
+	for elapsed in [0.0, 10.0, 25.0, 40.0]:
+		game.remaining = Game.ROUND_LENGTH - elapsed
+		for i in range(100):
+			assert(game._next_nugget_kind() in ["golden", "big_golden"])
+	game._start_boss()
+	assert(game.banner == "THE BIG GOLDEN CHOMP!")
+	for hp in [40, 20, 10]:
+		game.boss_hp = hp
+		assert(game._boss_contains_mouth(game.boss_pos))
+	var normal_best := game.best
+	game.score = normal_best + 1000
+	game._finish_round()
+	assert(game.best == normal_best and game.golden_best >= game.score)
+	game._handle_action("start") # Results replay always starts a normal round.
+	assert(not game.golden_club_enabled and game.old_best == normal_best)
+	var club_best := game.golden_best
+	if not OS.has_feature("standalone"):
+		var path := "res://build/test_save.cfg"
+		game._save_settings(path)
+		var cfg := ConfigFile.new()
+		assert(cfg.load(path) == OK)
+		assert(not cfg.has_section_key("club", "unlocked"))
+		assert(not cfg.has_section_key("club", "enabled"))
+		# Older saves must not restore the previous sticky mode.
+		cfg.set_value("club", "unlocked", true)
+		cfg.set_value("club", "enabled", true)
+		assert(cfg.save(path) == OK)
+		game.golden_best = 0
+		game._load_settings(path)
+		assert(not game.golden_club_enabled and game.golden_best == club_best)
+		DirAccess.remove_absolute(path)
+	game._handle_action("home")
+	for i in range(7):
+		game._activate_button_at(nose)
+	game._handle_action("golden_feast")
+	assert(game.golden_club_enabled)
+	game._pause()
+	game._resume()
+	assert(game.golden_club_enabled)
+	game._handle_action("home")
+	assert(not game.golden_club_enabled)
+	game._start_round()
+	assert(game.old_best == normal_best)
+	game.remaining = Game.ROUND_LENGTH
+	for i in range(50):
+		assert(game._next_nugget_kind() == "regular")
+	print("GOLDEN CLUB CHECK: seven-tap entry, one-round feast, normal replay, gold-only spawns, boss masks and score-only persistence.")
+	return true
 
 static func _touch(game: Game, index: int, position: Vector2, pressed: bool, canceled := false) -> void:
 	var event := InputEventScreenTouch.new()

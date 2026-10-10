@@ -33,6 +33,14 @@ Preserve this story, disclosure and credits when publishing the game.
 
 ## Play
 
+**Secret Golden Kitty Club (source):** click or tap the title cat's nose seven times
+to reveal the secret club screen, then choose **Let's feast!** for one golden round.
+Only golden nuggets spawn (including the rare big golden), and the boss becomes
+**The Big Golden Chomp**. Each golden round requires entering through the secret
+screen again; title starts and results replays are normal rounds. Only the separate
+club best score is saved, with no persistent unlock or toggle. Click elsewhere on
+the portrait to meet another cat.
+
 Open `project.godot` in Godot and press **F6/F5**, or build a native release:
 
 ```sh

@@ -84,6 +84,7 @@ var disgust_art := CatAppearance.new()
 var disgust_tex: Texture2D
 var dance_tex: Texture2D
 var boss_masks: Array[BitMap] = []
+var golden_boss_masks: Array[BitMap] = []
 var room := RoomBackground.new()
 var cat_palettes: Array[Dictionary] = []
 var cat_tex: Texture2D
@@ -144,6 +145,10 @@ var random := RandomNumberGenerator.new()
 
 # Persisted preferences and window restoration state.
 var best := 0
+# Round-only variant, entered exclusively through the secret club screen.
+var golden_club_enabled := false
+var golden_best := 0
+var nose_taps := 0
 var master_volume := 1.0
 var music_volume := 0.55
 var sfx_volume := 0.7
@@ -196,6 +201,9 @@ func _ready() -> void:
 		var mask := BitMap.new()
 		mask.create_from_image_alpha(texture.get_image().get_region(Rect2i(_nugget_region("big", 0, stage))))
 		boss_masks.append(mask)
+		var golden_mask := BitMap.new()
+		golden_mask.create_from_image_alpha(texture.get_image().get_region(Rect2i(_nugget_region("big_golden", 0, stage))))
+		golden_boss_masks.append(golden_mask)
 	cat_palettes = cat_art.palettes
 	_select_cat(_random_choice(-1, cat_palettes.size()))
 	windowed_size = get_window().size
@@ -276,6 +284,9 @@ func _toggle_fullscreen() -> void:
 
 func _change_screen(next_screen: ScreenLayout.Screen) -> void:
 	state = next_screen
+	if state == Screen.TITLE:
+		golden_club_enabled = false
+	nose_taps = 0
 	volume_drag = -1
 	active_touch = -1
 	touch_target = cat
@@ -315,6 +326,7 @@ func _load_settings(path: String = SAVE_PATH) -> void:
 	var cfg := ConfigFile.new()
 	if cfg.load(path) == OK:
 		best = maxi(0, int(cfg.get_value("game", "best", 0)))
+		golden_best = maxi(0, int(cfg.get_value("club", "best", 0)))
 		master_volume = clampf(float(cfg.get_value("audio", "master", 1.0)), 0, 1)
 		music_volume = clampf(float(cfg.get_value("audio", "music", 0.55)), 0, 1)
 		sfx_volume = clampf(float(cfg.get_value("audio", "effects", 0.7)), 0, 1)
@@ -327,6 +339,7 @@ func _save_settings(path: String = SAVE_PATH) -> void:
 		return
 	var cfg := ConfigFile.new()
 	cfg.set_value("game", "best", best)
+	cfg.set_value("club", "best", golden_best)
 	cfg.set_value("audio", "master", master_volume)
 	cfg.set_value("audio", "music", music_volume)
 	cfg.set_value("audio", "effects", sfx_volume)
@@ -392,10 +405,12 @@ func _input(event: InputEvent) -> void:
 				_pause()
 			elif state == Screen.PAUSED:
 				_resume()
-			elif state in [Screen.SETTINGS, Screen.GUIDE, Screen.SOURCES]:
+			elif state in [Screen.SETTINGS, Screen.GUIDE, Screen.SOURCES, Screen.GOLDEN_CLUB]:
 				_close_overlay()
 		elif event.is_action_pressed("confirm", false, true):
-			if state in [Screen.TITLE, Screen.RESULTS]:
+			if state == Screen.GOLDEN_CLUB:
+				_handle_action("golden_feast")
+			elif state in [Screen.TITLE, Screen.RESULTS]:
 				_start_round()
 			elif state == Screen.PAUSED:
 				_resume()
@@ -423,7 +438,7 @@ func _handle_touch(event: InputEvent) -> void:
 					volume_drag = i
 					_drag_volume(event.position.x)
 					return
-		var action := ScreenLayout.action_at(state, event.position, platform.can_quit(), platform.supports_fullscreen())
+		var action := _action_at(event.position)
 		if not action.is_empty():
 			_handle_action(action)
 		elif state == Screen.PLAYING:
@@ -448,16 +463,40 @@ func _update_cat_motion(delta: float) -> void:
 
 
 func _activate_button_at(pointer: Vector2) -> void:
-	var action := ScreenLayout.action_at(state, pointer, platform.can_quit(), platform.supports_fullscreen())
+	var action := _action_at(pointer)
 	if not action.is_empty():
 		_handle_action(action)
 
 
+func _action_at(pointer: Vector2) -> String:
+	if state == Screen.TITLE and ScreenLayout.title_nose_rect(_title_mouth()).has_point(pointer):
+		return "nose_tap"
+	return ScreenLayout.action_at(state, pointer, platform.can_quit(), platform.supports_fullscreen())
+
+func _current_best() -> int:
+	return golden_best if golden_club_enabled else best
+
 func _handle_action(action: String) -> void:
 	if not platform.allows_action(action):
 		return
+	if action == "golden_feast" and state != Screen.GOLDEN_CLUB:
+		return
+	if action == "nose_tap":
+		if state != Screen.TITLE:
+			return
+		nose_taps += 1
+		expression = 0.42
+		_sound("catch", 1.0 + nose_taps * 0.12)
+		if nose_taps == 7:
+			title_snack = null
+			_sound("reaction_yay")
+			_open_overlay(Screen.GOLDEN_CLUB)
+		queue_redraw()
+		return
 	_sound("catch", 0.8)
 	match action:
+		"golden_feast":
+			_start_round()
 		"start": _start_round()
 		"resume": _resume()
 		"pause": _pause()
@@ -469,6 +508,7 @@ func _handle_action(action: String) -> void:
 			audio.resume_music()
 		"cat_shuffle":
 			if state == Screen.TITLE:
+				nose_taps = 0
 				_select_cat(_random_choice(cat_palette, cat_palettes.size()))
 				title_cat_selected = true
 				expression = 0.42
@@ -522,6 +562,7 @@ func _drag_volume(pointer_x: float) -> void:
 # ---- Round lifecycle and simulation. ----
 
 func _start_round() -> void:
+	golden_club_enabled = state == Screen.GOLDEN_CLUB
 	_change_screen(Screen.PLAYING)
 	round_phase = RoundPhase.CATCHING
 	boss_hp = BOSS_BITES
@@ -552,7 +593,7 @@ func _start_round() -> void:
 	_plan_rare_spawns()
 	streak = 0
 	longest = 0
-	old_best = best
+	old_best = _current_best()
 	spawn_in = 0.25
 	expression = 0
 	offended = 0
@@ -565,7 +606,7 @@ func _start_round() -> void:
 	cat = _cat_input_position()
 	cat_previous = cat
 	cat_velocity = Vector2.ZERO
-	banner = "FOLLOW YOUR APPETITE!"
+	banner = "CHIEF TASTE TESTER!" if golden_club_enabled else "FOLLOW YOUR APPETITE!"
 	banner_time = 2.0
 	last_second = 60
 	audio.stop_finale()
@@ -591,7 +632,10 @@ func _finish_round() -> void:
 	results_time = 0.0
 	expression = 0.0
 	remaining = 0
-	best = maxi(best, score)
+	if golden_club_enabled:
+		golden_best = maxi(golden_best, score)
+	else:
+		best = maxi(best, score)
 	_save_settings()
 	audio.stop_finale()
 	_set_music_rate(1.0)
@@ -750,7 +794,7 @@ func _start_boss() -> void:
 	sweep_pending = false
 	sweep_time = 0.0
 	popups.clear()
-	banner = "BOSS NUGGET! HOLD YOUR MOUTH ON IT!"
+	banner = "THE BIG GOLDEN CHOMP!" if golden_club_enabled else "BOSS NUGGET! HOLD YOUR MOUTH ON IT!"
 	banner_time = 2.0
 	_sound("combo", 0.65)
 	_start_panic_music()
@@ -808,6 +852,8 @@ func _next_nugget_kind() -> String:
 	if not rare_spawn_times.is_empty() and elapsed >= rare_spawn_times[0]:
 		rare_spawn_times.remove_at(0)
 		return "big_golden"
+	if golden_club_enabled:
+		return "golden"
 	var roll := random.randf()
 	var threshold := 0.0
 	for kind in ["big", "burnt", "golden"]:
@@ -1001,6 +1047,8 @@ func _draw() -> void:
 		_nugget_guide()
 	elif state == Screen.SOURCES:
 		_sources()
+	elif state == Screen.GOLDEN_CLUB:
+		_golden_club()
 	else:
 		_playfield()
 		if state == Screen.PAUSED:
@@ -1174,7 +1222,7 @@ func _hud() -> void:
 	for i in range(5):
 		draw_rect(Rect2(219 + i * 7, 31, 5, 5), GOLD if i < streak % 5 or _multiplier() == 5 else Color("725866"))
 	_text("%02d" % ceili(remaining), Vector2(320, 15), 24, PINK if remaining <= 10 else CREAM, true)
-	_text("BEST %05d" % best, Vector2(398, 11), 8, MINT)
+	_text("%s %05d" % ["CLUB" if golden_club_enabled else "BEST", _current_best()], Vector2(398, 11), 8, MINT)
 	_text("%d CAUGHT" % catches, Vector2(398, 28), 8)
 	_button("II", "pause")
 	# Bottom prompt sits on the counter.
@@ -1188,7 +1236,7 @@ func _title_mouth() -> Vector2:
 func _update_title_snack(delta: float) -> void:
 	title_snack_wait -= delta
 	if title_snack_wait <= 0 and title_snack == null:
-		var kinds := ["regular", "big", "golden", "big_golden"]
+		var kinds := ["golden", "big_golden"] if golden_club_enabled else ["regular", "big", "golden", "big_golden"]
 		var kind: String = kinds[title_snack_rng.randi_range(0, kinds.size() - 1)]
 		var angle := title_snack_rng.randf_range(0.0, TAU)
 		var origin := _title_mouth() + Vector2(cos(angle) * 57, sin(angle) * 45)
@@ -1257,6 +1305,20 @@ func _title() -> void:
 		shortcuts += "  /  ALT+ENTER: FULLSCREEN" if platform.web else "  /  F11: FULLSCREEN"
 	_text(shortcuts, Vector2(320, 348), 8, INK, true)
 
+func _golden_club() -> void:
+	_panel(Rect2(70, 28, 500, 305))
+	_text("YOU FOUND THE", Vector2(320, 51), 8, MINT, true)
+	_text("GOLDEN KITTY CLUB!", Vector2(320, 75), 16, GOLD, true)
+	for i in range(8):
+		var spark := Vector2(320, 142) + Vector2.RIGHT.rotated(i * TAU / 8 + clock * 0.3) * Vector2(76, 28)
+		draw_line(spark - Vector2(3, 0), spark + Vector2(3, 0), GOLD, 2)
+		draw_line(spark - Vector2(0, 3), spark + Vector2(0, 3), GOLD, 2)
+	draw_texture_rect_region(nugget_tex, Rect2(297, 119, 46, 46), _nugget_region("big_golden"))
+	_text("EVERYTHING IS GOLD. EVERYTHING IS DELICIOUS.", Vector2(320, 181), 8, CREAM, true)
+	_text("CHIEF TASTE TESTER / CLUB BEST: %05d" % golden_best, Vector2(320, 217), 8, GOLD, true)
+	_button("LET'S FEAST!", "golden_feast", true)
+	_button("BACK", "back")
+
 func _boss_stage() -> int:
 	return 3 if boss_hp > 27 else (2 if boss_hp > 13 else 1)
 
@@ -1268,7 +1330,7 @@ func _boss_contains_mouth(mouth: Vector2) -> bool:
 	# central target. The same rotation, scale and damage stage drive rendering.
 	var local := (mouth - boss_pos).rotated(-sin(boss_age * 1.2) * 0.12) * 32.0 / _boss_size() + Vector2(16, 16)
 	var radius := BOSS_MOUTH_RADIUS * 32.0 / _boss_size()
-	var mask := boss_masks[_boss_stage() - 1]
+	var mask := (golden_boss_masks if golden_club_enabled else boss_masks)[_boss_stage() - 1]
 	for y in range(maxi(0, floori(local.y - radius)), mini(32, ceili(local.y + radius))):
 		for x in range(maxi(0, floori(local.x - radius)), mini(32, ceili(local.x + radius))):
 			if mask.get_bit(x, y):
@@ -1282,7 +1344,7 @@ func _draw_boss() -> void:
 	var texture := nugget_tex if stage == 3 else nugget_bite_tex
 	var size := _boss_size()
 	draw_set_transform(boss_pos, sin(boss_age * 1.2) * 0.12)
-	draw_texture_rect_region(texture, Rect2(-size / 2, -size / 2, size, size), _nugget_region("big", 0, stage))
+	draw_texture_rect_region(texture, Rect2(-size / 2, -size / 2, size, size), _nugget_region("big_golden" if golden_club_enabled else "big", 0, stage))
 	draw_set_transform(Vector2.ZERO)
 	draw_rect(Rect2(200, 307, 240, 9), INK)
 	draw_rect(Rect2(202, 309, 236.0 * boss_hp / BOSS_BITES, 5), GOLD)
@@ -1327,9 +1389,9 @@ func _results() -> void:
 	_text("BOSS DEVOURED! BELLY DANCE!" if boss_defeated else "BOSS ESCAPED! STILL WELL FED.", Vector2(320, 77), 8, PINK, true)
 	_victory_dance()
 	_text(CAT_NAMES[cat_name_index], Vector2(200, 177), 8, MINT, true)
-	_text("FINAL SCORE", Vector2(376, 102), 8, MINT, true)
+	_text("CLUB SCORE" if golden_club_enabled else "FINAL SCORE", Vector2(376, 102), 8, MINT, true)
 	_text("%05d" % score, Vector2(376, 123), 32, CREAM, true)
-	_text("BEST %05d" % best, Vector2(376, 164), 8, GOLD, true)
+	_text("BEST %05d" % _current_best(), Vector2(376, 164), 8, GOLD, true)
 	draw_line(Vector2(145, 191), Vector2(495, 191), Color("796274"))
 	for i in range(4):
 		var x := 172 + i * 98

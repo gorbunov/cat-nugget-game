@@ -11,22 +11,22 @@ Checked **2026-10-10** against Butler and Apple's notarization service:
 | Item | State |
 |---|---|
 | Game / engine | 0.11.5 / Godot 4.7.2 |
-| itch.io `mac` | Processed build #2100342; Developer ID-signed, notarized and stapled |
-| itch.io `windows` | Processed build #2099807 |
-| itch.io `html5` | Processed build #2099810 |
+| itch.io `mac` | Processed build #2101023; Developer ID-signed, notarized and stapled |
+| itch.io `windows` | Processed build #2101024 |
+| itch.io `html5` | Processed build #2101025 |
 | Developer ID signature | Verified, with secure timestamp and hardened runtime |
-| Apple submission | `fd5864c5-a387-45cb-84ad-9b4b5df2b81c` — **Accepted**; ticket/signature validation and Gatekeeper assessment passed |
+| Apple submission | `b7238436-7cff-46c2-a409-99605cadcbce` — **Accepted**; ticket/signature validation and Gatekeeper assessment passed |
 
 The project page exists; public access is not confirmed (an unauthenticated request
 returned 404). Embedded play and desktop download/install/update checks are
 not yet verified. All three exports and
 game/audio checks have passed; Safari and Chrome passed owner browser playtesting.
 
-Retained notarized release directory: `build/itch/0.11.5-20261010T124553910938Z`.
+Retained notarized release directory: `build/itch/0.11.5-20261010T164319443034Z`.
 Keep its archives, `build.json`, `macos/notarization.json`, `deployment.json` and logs intact.
 
 ```sh
-xcrun notarytool info fd5864c5-a387-45cb-84ad-9b4b5df2b81c --keychain-profile NuggetCat-notary
+xcrun notarytool info b7238436-7cff-46c2-a409-99605cadcbce --keychain-profile NuggetCat-notary
 build/butler/butler status gorbunov/nugget-cat:mac
 ```
 
@@ -138,11 +138,11 @@ story, controls, AI disclosure and all three CC0 sound links from README.
 ## Cloudflare custom-domain Web deployment
 
 **https://cat-nugget.gorbunov.dev** was deployed on **2026-10-10** to Worker
-`nugget-cat`, version `0baa228c-e043-4ff1-a17c-d8a4982d7e90` (game 0.11.5).
-The build, packaging and local HTTP checks passed. Cloudflare public DNS resolves
-the hostname; HTTPS returned 200 and the live WASM decoded to the expected
-39,514,754-byte engine. Initial verification used the published Cloudflare IP
-because the local resolver had not yet picked up the new DNS record.
+`nugget-cat`, version `cbe0ef0b-7fac-4655-9ee9-52689c022b21` (game 0.11.5).
+The build and packaging checks passed. Public HTTPS resolves normally and returns
+200; the live WASM decodes to the expected 39,514,754-byte engine. The downloaded
+game pack matches both the Cloudflare export and the latest itch.io Web export
+(SHA-256 `e49e4bc85efdefe956b43fe9729c1b2d922c01334c6c761078968e8fc1159b5f`).
 Device/browser playtesting of the published hostname remains pending.
 
 From the repository root (Node.js 22+ and the pinned Godot are required):

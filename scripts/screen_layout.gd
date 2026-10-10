@@ -1,7 +1,7 @@
 extends RefCounted
 ## Shared geometry for drawing and hit testing; drawing never registers controls.
 
-enum Screen { TITLE, PLAYING, PAUSED, RESULTS, SETTINGS, GUIDE, SOURCES }
+enum Screen { TITLE, PLAYING, PAUSED, RESULTS, SETTINGS, GUIDE, SOURCES, GOLDEN_CLUB }
 
 const PAUSE_BUTTON := Rect2(588, 11, 34, 27)
 const BUTTONS := {
@@ -13,6 +13,10 @@ const BUTTONS := {
 		"quit": Rect2(483, 252, 78, 26),
 		"sources": Rect2(169, 308, 110, 18),
 		"guide": Rect2(366, 293, 195, 24),
+	},
+	Screen.GOLDEN_CLUB: {
+		"golden_feast": Rect2(210, 252, 220, 30),
+		"back": Rect2(250, 294, 140, 26),
 	},
 	Screen.PLAYING: {"pause": PAUSE_BUTTON},
 	Screen.PAUSED: {
@@ -54,6 +58,10 @@ static func button_rect(screen: Screen, action: String) -> Rect2:
 	if action == "pause":
 		return PAUSE_BUTTON
 	return BUTTONS[screen][action]
+
+
+static func title_nose_rect(mouth: Vector2) -> Rect2:
+	return Rect2(mouth + Vector2(-16, -24), Vector2(32, 28))
 
 
 static func action_at(screen: Screen, position: Vector2, can_quit: bool = true, supports_fullscreen: bool = true) -> String:

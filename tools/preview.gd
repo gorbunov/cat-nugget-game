@@ -11,6 +11,19 @@ func _run() -> void:
 	root.add_child(game)
 	game.clock = 1.0
 	DirAccess.make_dir_recursive_absolute("res://build/previews")
+	if "--golden-club" in OS.get_cmdline_user_args():
+		for i in range(7):
+			game._activate_button_at(game.ScreenLayout.title_nose_rect(game._title_mouth()).get_center())
+		await _capture(game, "golden_club")
+		game._handle_action("golden_feast")
+		game.remaining = game.BOSS_DURATION
+		game._start_boss()
+		game.cat = Vector2(245, 240)
+		for hp in [40, 26, 12]:
+			game.boss_hp = hp
+			await _capture(game, "golden_boss_%02d" % hp)
+		quit()
+		return
 	if "--layouts" in OS.get_cmdline_user_args():
 		await _preview_layouts(game)
 		quit()
