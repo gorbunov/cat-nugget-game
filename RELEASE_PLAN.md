@@ -5,9 +5,6 @@ in [README](README.md); release status and commands are in [Deployment](DEPLOYME
 
 ## Next release validation
 
-- [ ] Resume the existing Apple submission after acceptance, verify the stapled
-  ticket and Gatekeeper assessment, and upload the notarized Mac archive. Use the
-  retained directory in DEPLOYMENT.md; do not rebuild merely to poll Apple.
 - [ ] Download the Mac build through a browser and verify normal launch, a full
   round, settings/save persistence and replay without a Gatekeeper workaround.
 - [ ] Test Windows on a real device: install/extract, start, catch, audio,

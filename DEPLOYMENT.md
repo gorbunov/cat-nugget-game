@@ -11,23 +11,23 @@ Checked **2026-10-10** against Butler and Apple's notarization service:
 | Item | State |
 |---|---|
 | Game / engine | 0.11.5 / Godot 4.7.2 |
-| itch.io `mac` | Processed build #2099799; ad-hoc-signed playtest |
+| itch.io `mac` | Processed build #2100342; Developer ID-signed, notarized and stapled |
 | itch.io `windows` | Processed build #2099807 |
 | itch.io `html5` | Processed build #2099810 |
 | Developer ID signature | Verified, with secure timestamp and hardened runtime |
-| Apple submission | `fd5864c5-a387-45cb-84ad-9b4b5df2b81c` — **In Progress** |
+| Apple submission | `fd5864c5-a387-45cb-84ad-9b4b5df2b81c` — **Accepted**; ticket/signature validation and Gatekeeper assessment passed |
 
 The project page exists; public access is not confirmed (an unauthenticated request
-returned 404). Embedded play, desktop download/install/update checks and the
-first accepted/stapled Mac release are not yet verified. All three exports and
+returned 404). Embedded play and desktop download/install/update checks are
+not yet verified. All three exports and
 game/audio checks have passed; Safari and Chrome passed owner browser playtesting.
 
-Pending notarization directory: `build/itch/0.11.5-20261010T124553910938Z`.
-Keep its archives, `build.json`, `macos/notarization.json` and logs intact.
+Retained notarized release directory: `build/itch/0.11.5-20261010T124553910938Z`.
+Keep its archives, `build.json`, `macos/notarization.json`, `deployment.json` and logs intact.
 
 ```sh
 xcrun notarytool info fd5864c5-a387-45cb-84ad-9b4b5df2b81c --keychain-profile NuggetCat-notary
-python3 tools/deploy_itch.py --resume build/itch/0.11.5-20261010T124553910938Z
+build/butler/butler status gorbunov/nugget-cat:mac
 ```
 
 ## Local builds
@@ -78,8 +78,8 @@ game requires no JIT, native plug-in or debugging entitlement exceptions;
 
 The tool waits up to ten minutes. Only **Accepted** submissions proceed to ticket
 stapling, ticket/signature validation, Gatekeeper assessment and repackaging. The
-uploaded ZIP must contain the stapled app. These final steps are implemented but
-await verification on the first accepted submission.
+uploaded ZIP must contain the stapled app. These final steps passed for the
+current Mac release.
 
 ```sh
 xcrun notarytool history --keychain-profile NuggetCat-notary
