@@ -1,0 +1,27 @@
+{
+  "request": {
+    "model": "gpt-image-2.5-flare",
+    "prompt": "Create a production-quality pixel-art sprite sheet for a cute 2D game called Nugget Cat.\n\nOUTPUT LAYOUT IS CRITICAL:\n- Transparent PNG background, no checkerboard drawn into the image.\n- Exactly THREE separate hand/forearm sprites, arranged LEFT TO RIGHT in ONE horizontal row, with equal spacing and equal scale.\n- Canvas is 1536 wide by 1024 tall. Each pose has its own 512-pixel-wide column. Center all three sprites vertically at y=512. Leave ample transparent space around and between them.\n- Every forearm enters from the LEFT side of its own cell and every hand faces RIGHT. Same camera angle, same skin color, same sleeve, same wrist thickness, same wrist anchor in all three poses.\n- No text, lettering, labels, numbers, panel dividers, borders, floor, cast shadow, food, nuggets, props, faces or extra hands.\n\nART DIRECTION:\nBeautiful, confident, charming 16-bit pixel art, designed to remain readable at about 64x48 actual game pixels per pose. Show that low-resolution art enlarged with large, crisp, square pixels, not a high-resolution digital painting or vector illustration. Strong silhouettes, clean pixel clusters, stepped contours, no anti-aliasing, no fuzzy edges, no texture noise, no tiny details. Use a limited cohesive palette, about 12 colors total. Dark warm plum outline (#423044), peach skin with warm terracotta shadows and pale peach highlights, desaturated sage/teal long sleeve (#749f98), cream ribbed cuff (#fff0cd). A little cel-shaded depth. Cozy kitchen game aesthetic, friendly and playful.\n\nHAND DESIGN:\nA rounded human cartoon hand, side / slightly three-quarter view, with a clearly readable thumb, index finger and other folded fingers. Anatomically coherent, not a mitten, not a pointing weapon, no gloves. The sleeve and short forearm occupy the left third of each sprite, the expressive hand occupies the right two thirds. Consistent light from upper left. Thick but elegant one-pixel-equivalent outline and a few well-placed crease pixels. Each sprite should be approximately 420 pixels wide by 270 pixels high on the output canvas, using chunky pixel blocks.\n\nPOSES, LEFT TO RIGHT:\n1. READY / HOLDING: palm angled slightly upward, thumb and index finger close together in a relaxed pinch near the right end, as if holding a very small snack. Remaining three fingers curl gently into the palm. Do NOT draw the snack.\n2. WIND-UP: same hand preparing a small underhand toss to the right. Wrist flexes backward/up slightly, pinched thumb/index lifted a little. Other fingers still folded. Clear anticipation silhouette, but keep sleeve and wrist at the same anchor as pose 1.\n3. RELEASE / FOLLOW-THROUGH: wrist tips forward gently; palm opens upward/right, index and middle fingers extend naturally toward the right, ring and little fingers follow slightly bent, thumb opens away from index. A welcoming tossing gesture, NOT an aggressively pointing finger. No snack and no motion lines.\n\nMake this a clean usable animation sprite sheet rather than an illustration about sprite sheets. Prioritize expressive hand anatomy and consistency across the three frames.\n",
+    "n": 1,
+    "size": "1536x1024",
+    "quality": "medium",
+    "background": "transparent",
+    "output_format": "png"
+  },
+  "request_id": "req_951d754f35054b47887387d0d4995ded",
+  "created": 1791616894,
+  "usage": {
+    "input_tokens": 661,
+    "input_tokens_details": {
+      "image_tokens": 0,
+      "text_tokens": 661
+    },
+    "output_tokens": 343,
+    "output_tokens_details": {
+      "image_tokens": 343,
+      "text_tokens": 0
+    },
+    "total_tokens": 1004
+  },
+  "revised_prompt": null
+}

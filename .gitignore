@@ -1,0 +1,30 @@
+# Godot 4 editor cache and generated imports.
+/.godot/
+
+# Exported apps, archives, downloaded templates, and test previews.
+/build/
+
+# Local export credentials (export_presets.cfg stays tracked).
+/export_credentials.cfg
+
+# Python asset-generation tools.
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Local environment variables / API keys.
+.env
+.env.*
+!.env.example
+!.env.sample
+
+# macOS metadata.
+.DS_Store
+._*
+
+# Keep source art, generated game assets, *.import, *.uid, and .gdignore files
+# tracked: they are part of the reproducible Godot project.
